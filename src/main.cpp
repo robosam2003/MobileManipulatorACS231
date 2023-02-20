@@ -35,18 +35,20 @@ double armAngles[3] = {0};
 
 
 // Number positions
-double numberPositions[10][3] = {
-  {-150, 70, 70}, // 0
-  {-125, 110, 40}, // 1
-  {-95, 130, 30}, // 2
-  {-60, 130, 20}, // 3
-  {-20, 140, 20}, // 4
-  {15,  140, 20}, // 5
-  {55,  140, 20}, // 6
-  {90,  130, 30}, // 7
-  {130,  120, 45}, // 8
-  {150,  90, 60}  // 9
-};
+//double numberPositions[10][3] = {
+//  {-150, 70, 70}, // 0
+//  {-125, 110, 40}, // 1
+//  {-95, 130, 30}, // 2
+//  {-60, 130, 20}, // 3
+//  {-20, 140, 20}, // 4
+//  {15,  140, 20}, // 5
+//  {55,  140, 20}, // 6
+//  {90,  130, 30}, // 7
+//  {130,  120, 45}, // 8
+//  {150,  90, 60}  // 9
+//};
+
+
 
 
 double floatMap(double x, double in_min, double in_max, double out_min, double out_max) {
@@ -97,24 +99,24 @@ void cartesianToSpherical(double coords[3], double lengths[3], double angles[3])
     angles[0] = atan2(x, y);
 
     double theta2_prime = acos( (l1*l1 + l2*l2 - l*l) / (2*l1*l2) );
-    Serial.println(theta2_prime);
+    //Serial.println(theta2_prime);
     double a = atan2(z, y);
-    Serial.println(a);
+    //Serial.println(a);
     double b = asin( (sin(theta2_prime)*lengths[2]) / l );
-    Serial.println(b);
+    //Serial.println(b);
     angles[1] = a + b;
     angles[2] = -(PI - theta2_prime);
 
-    Serial.println(l);
-    Serial.println(angles[0]);
-    Serial.println(angles[1]);
-    Serial.println(angles[2]);
+//    Serial.println(l);
+//    Serial.println(angles[0]);
+//    Serial.println(angles[1]);
+//    Serial.println(angles[2]);
     // forward kinematics
-    Serial.print("FORWARD KINEMATICS:  ");
-    Serial.print(l1*cos(angles[1])+ l2*cos(angles[1] + angles[2]));
-    Serial.print(",   ");
-    Serial.print(l0+l1*sin(angles[1])+ l2*sin(angles[1] + angles[2]));
-    Serial.println("\n");
+//    Serial.print("FORWARD KINEMATICS:  ");
+//    Serial.print(l1*cos(angles[1])+ l2*cos(angles[1] + angles[2]));
+//    Serial.print(",   ");
+//    Serial.print(l0+l1*sin(angles[1])+ l2*sin(angles[1] + angles[2]));
+//    Serial.println("\n");
 
 }
 
@@ -146,6 +148,32 @@ void home() {
     goToPosition(homePosition);
 }
 
+void drawStraightLine(double initialPosition[], double endPosition[]) {
+    goToPosition(initialPosition);
+    // Vector between two points
+    double v[3] = {endPosition[0] - initialPosition[0],
+                   endPosition[1] - initialPosition[1],
+                   endPosition[2] - initialPosition[2]};
+    // normalise the vector
+    double magnitude_v = sqrt(pow(v[0], 2) + pow(v[1], 2) + pow(v[2], 2));
+    double v_hat[3] = {v[0]/magnitude_v, v[1]/magnitude_v, v[2]/magnitude_v};
+
+    // step size
+    double stepSize = 0.05;
+    // number of steps
+    int n = magnitude_v / stepSize;
+
+    for (int i = 0; i < n; i++) {
+        // Step along the line.
+        double position[3] = {initialPosition[0] + i*stepSize*v_hat[0],
+                              initialPosition[1] + i*stepSize*v_hat[1],
+                              initialPosition[2] + i*stepSize*v_hat[2]};
+        goToPosition(position);
+        delay(stepSize*5); // or some scalar.
+    }
+
+}
+
 void setup() {
     timestamp = millis();
     S1.attach(S1_PWM);
@@ -155,41 +183,22 @@ void setup() {
     Serial.begin(9600);
 }
 
-//  Lab 2
+double positions[3][3] = {{0, 120, 240},
+                          {0, 160, 240},
+                          {0, 150, 190}};
+
 void loop() {
-    double coords[3] = {0, 180, 160};
 
 
-    // number sequencing
-//    home();
-//    delay(1000);
-//    int sequence[5] = {6, 0, 3, 9, 3};
-//    for (int i : sequence) {
-//        goToPosition(numberPositions[i]);
-//        delay(2000);      mostafa
-//
-//        home();
-//        delay(2000);
-//    }
-//
-//    delay(4000);
-
-// Straight line bit
-    while (coords[2] >= 160-101 ) {
-        // print coords
-        Serial.print("X: ");
-        Serial.print(coords[0]);
-        Serial.print(" Y: ");
-        Serial.print(coords[1]);
-        Serial.print(" Z: ");
-        Serial.println(coords[2]);
-
-        goToPosition(coords);
-        coords[2] -= (double)100/11;
-        delay(500);
-    }
-    Serial.println("---------------------------------\n\n\n");
+    drawStraightLine(positions[0], positions[1]);
     delay(1000);
+    drawStraightLine(positions[1], positions[2]);
+    delay(1000);
+    drawStraightLine(positions[2], positions[1]);
+    delay(1000);
+    drawStraightLine(positions[1], positions[0]);
+    delay(1000);
+    Serial.println("---------------------------------\n\n\n");
 
 
 

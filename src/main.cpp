@@ -28,9 +28,6 @@ Servo S3;
 #define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
                                   //lower to decrease sensitivity
 
-#define RIGHT_MTR_I1
-#define RIGHT_MTR_I2
-#define RIGHT_MTR_PWM
 #define RIGHT_MTR_E1 20
 #define RIGHT_MTR_E2 21
 
@@ -57,6 +54,7 @@ double armAngles[3] = {0};
 int sensor1Low;
 int sensor2Low;
 int sensor3Low; //booleans for testing whether the sensor is detecting a line (low) or not (high)
+int horizontalLineCount = 0;
 
 Motor LeftMotor(LEFT_MTR_I1, LEFT_MTR_I2, LEFT_MTR_PWM, 1, STBY_PIN); //
 Motor RightMotor(RIGHT_MTR_I1, RIGHT_MTR_I2, RIGHT_MTR_PWM, 1, STBY_PIN); //
@@ -190,7 +188,7 @@ int line_sensor(){
     int sensorReading2 = analogRead(SENSOR2);
     int sensorReading3 = analogRead(SENSOR3);
 
-    if (sensorReading1 < LINE_SENSED_THRESHOLD){
+    if (sensorReading1 > LINE_SENSED_THRESHOLD){
         //Serial.println("Sensor 1 reads LOW");
         sensor1Low = 1;
     }
@@ -199,7 +197,7 @@ int line_sensor(){
         sensor1Low = 0;
     }
 
-    if (sensorReading2 < LINE_SENSED_THRESHOLD){
+    if (sensorReading2 > LINE_SENSED_THRESHOLD){
         //Serial.println("Sensor 2 reads LOW");
         sensor2Low = 1;
     }
@@ -208,7 +206,7 @@ int line_sensor(){
         sensor2Low = 0;
     }
 
-    if (sensorReading3 < LINE_SENSED_THRESHOLD){
+    if (sensorReading3 > LINE_SENSED_THRESHOLD){
         //Serial.println("Sensor 3 reads LOW");
         sensor3Low = 1;
     }
@@ -247,30 +245,7 @@ int line_sensor(){
     }
 }
 
-void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
-    switch(line_pos){
-        case -2:
-            //turn left
-            break;
-        case -1:
-            //turn left
-            break;
-        case 1:
-            //turn right
-            break;
-        case 2:
-            //turn right
-            break;
-        case -5:
-            //find the line
-            break;
-        case 5:
-            //start/stop
-            break;
-        default:
-            //go straight
-    }
-}
+
 
 void right_e1_ISR() {
     int e1 = digitalRead(RIGHT_MTR_E1);
@@ -390,7 +365,7 @@ void robot_backwards(int time) {
     RightMotor.brake();
 }
 
-void robot_spin_cw(int degrees) {
+void robot_spin_cw(int degrees) { // to the right
     int rotation = degrees * 3840 / 360;
     int some_other_condition = 1; // related to the line sensors
     while ((left_encoder_count < rotation && right_encoder_count < rotation) || (some_other_condition) ) {
@@ -399,7 +374,7 @@ void robot_spin_cw(int degrees) {
     }
 }
 
-void robot_spin_ccw(int degrees) {
+void robot_spin_ccw(int degrees) { // to the left
     int rotation = degrees * 3840 / 360;
     int some_other_condition = 1; // related to the line sensors
     while ((left_encoder_count < rotation && right_encoder_count < rotation) || (some_other_condition) ) {
@@ -413,6 +388,65 @@ void robot_stop() {
     RightMotor.brake();
 }
 
+void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
+    switch(line_pos){
+        case -2:
+            //turn a lot left
+            robot_spin_ccw(25);
+            robot_forward(200);
+            break;
+        case -1:
+            //turn a bit left
+            robot_spin_ccw(10);
+            robot_forward(200);
+            break;
+        case 1:
+            //turn a bit right
+            robot_spin_cw(10);
+            robot_forward(200);
+            break;
+        case 2:
+            //turn a lot right
+            robot_spin_cw(25);
+            robot_forward(200);
+            break;
+        case -5:
+            //find the line
+            robot_forward(100);//until case 5
+            break;
+        case 5:
+            //start/stop/right angle
+            horizontalLineCount++;
+            //first 5 should turn to the right, then go straight
+            if (horizontalLineCount == 1){
+                robot_spin_ccw(90);
+                robot_forward(500);
+            }
+            //second 5 should turn to the left, then go straight, then turn left again, then go straight
+            if (horizontalLineCount == 2){
+                robot_stop();
+                robot_spin_ccw(90);
+                robot_forward(1000);
+                robot_stop();
+                robot_spin_ccw(90);
+                robot_forward(500);
+            }
+            //third 5 should turn to the left, then go straight
+            if (horizontalLineCount == 3){
+                robot_spin_ccw(90);
+                robot_forward(100);
+            }
+            //fourth 5 should stop
+            if (horizontalLineCount == 4){
+                robot_stop();
+            }
+            break;
+        default:
+            //go straight
+            robot_forward(200);
+            break;
+    }
+}
 
 int i = 0;
 void loop() {

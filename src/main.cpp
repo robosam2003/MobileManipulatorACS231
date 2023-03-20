@@ -13,24 +13,15 @@ Servo S3;
 #define S2_PWM 10
 #define S3_PWM 11
 
-#define LEFT_MTR_I1 1
-#define LEFT_MTR_I2 0
+#define LEFT_MTR_I1 6
+#define LEFT_MTR_I2 7
 #define LEFT_MTR_PWM 4
 #define LEFT_MTR_E1 2
 #define LEFT_MTR_E2 3
 
 #define RIGHT_MTR_I1 22
-#define RIGHT_MTR_I2 23
+#define RIGHT_MTR_I2 24
 #define RIGHT_MTR_PWM 8
-#define SENSOR1 A0
-#define SENSOR2 A1
-#define SENSOR3 A2 //line sensor pins
-#define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
-                                  //lower to decrease sensitivity
-
-#define RIGHT_MTR_I1
-#define RIGHT_MTR_I2
-#define RIGHT_MTR_PWM
 #define RIGHT_MTR_E1 20
 #define RIGHT_MTR_E2 21
 
@@ -38,6 +29,14 @@ Servo S3;
 
 long int left_encoder_count = 0;
 long int right_encoder_count = 0;
+
+
+#define SENSOR1 A0
+#define SENSOR2 A1
+#define SENSOR3 A2 //line sensor pins
+#define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
+//lower to decrease sensitivity
+
 
 //#define POT_PIN_1 A0
 //#define POT_PIN_2 A1
@@ -248,7 +247,7 @@ int line_sensor(){
 }
 
 void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
-    switch(line_pos){
+    switch(line_pos) {
         case -2:
             //turn left
             break;
@@ -268,6 +267,7 @@ void move_according_to_line_sensor(int line_pos){ // line_pos value got from lin
             //start/stop
             break;
         default:
+            break;
             //go straight
     }
 }
@@ -342,7 +342,47 @@ void Assignment_4_robot_arm() {
 }
 
 void robot_forward(int time) {
-    int mtr_increment = 10;
+    // Closed loop control
+    int start = millis();
+    // Reset encoder counts
+    left_encoder_count = 0;
+    right_encoder_count = 0;
+
+    float left_speed = 64;
+    float right_speed = 64;
+
+    double integral = 0;
+
+    double P = 0.001;
+    double I = 0;
+
+
+    // Set motor speeds
+    while(true) {
+
+        double error = ((double) (left_encoder_count - right_encoder_count) ) / 10;
+        integral += error;
+        right_speed += P * error + I * integral;
+        left_speed -= P * error + I * integral;
+//        if (left_encoder_count > right_encoder_count) {
+//            right_speed += P * error + I * integral;
+//            left_speed -= P * error + I * integral;
+//        }
+//        else if (left_encoder_count < right_encoder_count) {
+//            left_speed += P * error + I * integral;
+//            right_speed -= P * error + I * integral;
+//        }
+//        delay(10);
+        // print encoders and speeds
+
+        Serial.println(String(error));
+        LeftMotor.drive((int) left_speed);
+        RightMotor.drive((int) right_speed);
+//        Serial.print(error);
+    }
+
+
+/*    int mtr_increment = 5;
     long int start = millis();
     // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
     while(millis()-start < time) { // would be line sensor interrupt or so
@@ -353,41 +393,82 @@ void robot_forward(int time) {
             Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
             LeftMotor.drive(255);
         }
+        LeftMotor.drive(0);
 //        LeftMotor.brake();
         while (right_encoder_count < old_right_encoder_count + mtr_increment) {
             Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            RightMotor.drive(153);
+            RightMotor.drive(255);
         }
+        RightMotor.drive(0);
 //        RightMotor.brake();
 
     }
     LeftMotor.brake();
-    RightMotor.brake();
+    RightMotor.brake();*/
 
 }
 
+//
+//void robot_backwards(int time) {
+//    int mtr_increment = 10;
+//    long int start = millis();
+//    // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
+//    while(millis()-start < time) { // would be line sensor interrupt or so
+//        long int old_left_encoder_count = left_encoder_count;
+//        long int old_right_encoder_count = right_encoder_count;
+//
+//        while (left_encoder_count > old_left_encoder_count - mtr_increment) {
+//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
+//            LeftMotor.drive(-255);
+//        }
+////        LeftMotor.brake();
+//        while (right_encoder_count > old_right_encoder_count - mtr_increment) {
+//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
+//            RightMotor.drive(-153);
+//        }
+////        RightMotor.brake();
+//
+//    }
+//    LeftMotor.brake();
+//    RightMotor.brake();
+//}
+
 void robot_backwards(int time) {
-    int mtr_increment = 10;
-    long int start = millis();
-    // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
-    while(millis()-start < time) { // would be line sensor interrupt or so
-        long int old_left_encoder_count = left_encoder_count;
-        long int old_right_encoder_count = right_encoder_count;
+    // Closed loop control
+    int start = millis();
+    // Reset encoder counts
+    left_encoder_count = 0;
+    right_encoder_count = 0;
 
-        while (left_encoder_count < old_left_encoder_count + mtr_increment) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            LeftMotor.drive(-255);
-        }
-//        LeftMotor.brake();
-        while (right_encoder_count < old_right_encoder_count + mtr_increment) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            RightMotor.drive(-153);
-        }
-//        RightMotor.brake();
+    float left_speed = 128;
+    float right_speed = 128;
 
+    double integral = 0;
+    double P = 0.001;
+    double I = 0;
+
+    // Set motor speeds
+    while (millis() - start < time) {
+        LeftMotor.drive((int) -left_speed);
+        RightMotor.drive((int) -right_speed);
+        double error = ((double) (left_encoder_count - right_encoder_count)) / 10;
+        integral += error;
+        right_speed += P * error + I * integral;
+        left_speed -= P * error + I * integral;
+//        if (left_encoder_count > right_encoder_count) {
+//            right_speed += P * error + I * integral;
+//            left_speed -= P * error + I * integral;
+//        }
+//        else if (left_encoder_count < right_encoder_count) {
+//            left_speed += P * error + I * integral;
+//            right_speed -= P * error + I * integral;
+//        }
+//        delay(10);
+        // print encoders and speeds
+
+        Serial.println(String(left_speed) + ", " + String(right_speed));
+//        Serial.print(error);
     }
-    LeftMotor.brake();
-    RightMotor.brake();
 }
 
 void robot_spin_cw(int degrees) {
@@ -408,16 +489,22 @@ void robot_spin_ccw(int degrees) {
     }
 }
 
-void robot_stop() {
+void robot_stop(int del) {
     LeftMotor.brake();
     RightMotor.brake();
+    delay(del);
 }
 
 
 int i = 0;
 void loop() {
-    robot_forward(1000);
-    robot_backwards(1000);
+    robot_forward(120000);
+//    robot_stop(1000);
+//    robot_backwards(1000);
+//    robot_stop(1000);
+//    robot_stop(1000);
+//    robot_backwards(1000);
+//    robot_stop(1000);
 //    robot_spin_cw(90);
 
 

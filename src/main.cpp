@@ -13,21 +13,15 @@ Servo S3;
 #define S2_PWM 10
 #define S3_PWM 11
 
-#define LEFT_MTR_I1 1
-#define LEFT_MTR_I2 0
+#define LEFT_MTR_I1 6
+#define LEFT_MTR_I2 7
 #define LEFT_MTR_PWM 4
 #define LEFT_MTR_E1 2
 #define LEFT_MTR_E2 3
 
 #define RIGHT_MTR_I1 22
-#define RIGHT_MTR_I2 23
+#define RIGHT_MTR_I2 24
 #define RIGHT_MTR_PWM 8
-#define SENSOR1 A0
-#define SENSOR2 A1
-#define SENSOR3 A2 //line sensor pins
-#define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
-                                  //lower to decrease sensitivity
-
 #define RIGHT_MTR_E1 20
 #define RIGHT_MTR_E2 21
 
@@ -35,6 +29,14 @@ Servo S3;
 
 long int left_encoder_count = 0;
 long int right_encoder_count = 0;
+
+
+#define SENSOR1 A0
+#define SENSOR2 A1
+#define SENSOR3 A2 //line sensor pins
+#define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
+//lower to decrease sensitivity
+
 
 //#define POT_PIN_1 A0
 //#define POT_PIN_2 A1
@@ -192,6 +194,33 @@ int line_sensor(){
     (sensorReading2 > LINE_SENSED_THRESHOLD) ? sensor2Low = 1 : sensor2Low = 0;
     (sensorReading3 > LINE_SENSED_THRESHOLD) ? sensor3Low = 1 : sensor3Low = 0;
 
+    if (sensorReading1 > LINE_SENSED_THRESHOLD){
+        //Serial.println("Sensor 1 reads LOW");
+        sensor1Low = 1;
+    }
+    else{
+        //Serial.println("Sensor 1 reads HIGH");
+        sensor1Low = 0;
+    }
+
+    if (sensorReading2 > LINE_SENSED_THRESHOLD){
+        //Serial.println("Sensor 2 reads LOW");
+        sensor2Low = 1;
+    }
+    else{
+        //Serial.println("Sensor 2 reads HIGH");
+        sensor2Low = 0;
+    }
+
+    if (sensorReading3 > LINE_SENSED_THRESHOLD){
+        //Serial.println("Sensor 3 reads LOW");
+        sensor3Low = 1;
+    }
+    else{
+        //Serial.println("Sensor 3 reads HIGH");
+        sensor3Low = 0;
+    }
+
     if (sensor1Low && sensor2Low && sensor3Low){
         Serial.println("Horizontal line found"); // 5
         return 5;
@@ -250,7 +279,7 @@ void setup() {
     S2.attach(S2_PWM);
     S3.attach(S3_PWM);
 
-    Serial.begin(9600);
+    Serial.begin(115200);
 
     // Left motor encoders
     pinMode(LEFT_MTR_E1, INPUT);
@@ -294,7 +323,56 @@ void Assignment_4_robot_arm() {
 }
 
 void robot_forward(int time) {
-    int mtr_increment = 10;
+    // Closed loop control
+    long loop_start = millis();
+    // Reset encoder counts
+    left_encoder_count = 0;
+    right_encoder_count = 0;
+
+    double left_speed = 120;
+    double right_speed = 120  ;
+
+    long old_left_encoder_count = left_encoder_count;
+    long old_right_encoder_count = right_encoder_count;
+
+
+    int loop_time_ms = 10;
+    delay(loop_time_ms);
+
+    // 4000 is the MAX for some reason
+    long reference_speed = (long)(4000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    double Kp = 0.1;
+
+    long start = millis();
+    while (millis()-start < time) {
+        loop_start = millis();
+        long left_error = reference_speed -  (left_encoder_count - old_left_encoder_count);
+           long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
+        long pos_diff = left_encoder_count - right_encoder_count;
+        old_left_encoder_count = left_encoder_count;
+        old_right_encoder_count = right_encoder_count;
+
+
+        left_speed += Kp * (double)left_error;
+        right_speed += Kp * (double)right_error;
+
+        // saturate speed
+        left_speed = constrain(left_speed, -255, 255);
+        right_speed = constrain(right_speed, -255, 255);
+
+
+        LeftMotor.drive(left_speed);
+        RightMotor.drive(right_speed);
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+        Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+        delay(loop_time_ms-(millis()-loop_start));
+    }
+
+
+
+
+/*    int mtr_increment = 5;
     long int start = millis();
     // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
     while(millis()-start < time) { // would be line sensor interrupt or so
@@ -305,44 +383,89 @@ void robot_forward(int time) {
             Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
             LeftMotor.drive(255);
         }
+        LeftMotor.drive(0);
 //        LeftMotor.brake();
         while (right_encoder_count < old_right_encoder_count + mtr_increment) {
             Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            RightMotor.drive(153);
+            RightMotor.drive(255);
         }
+        RightMotor.drive(0);
 //        RightMotor.brake();
 
     }
     LeftMotor.brake();
-    RightMotor.brake();
+    RightMotor.brake();*/
 
 }
+
+//
+//void robot_backwards(int time) {
+//    int mtr_increment = 10;
+//    long int start = millis();
+//    // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
+//    while(millis()-start < time) { // would be line sensor interrupt or so
+//        long int old_left_encoder_count = left_encoder_count;
+//        long int old_right_encoder_count = right_encoder_count;
+//
+//        while (left_encoder_count > old_left_encoder_count - mtr_increment) {
+//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
+//            LeftMotor.drive(-255);
+//        }
+////        LeftMotor.brake();
+//        while (right_encoder_count > old_right_encoder_count - mtr_increment) {
+//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
+//            RightMotor.drive(-153);
+//        }
+////        RightMotor.brake();
+//
+//    }
+//    LeftMotor.brake();
+//        while (right_encoder_count < old_right_encoder_count + mtr_increment) {
+//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
+//            RightMotor.drive(-153);
+//        }
+//    RightMotor.brake();
+//}
 
 void robot_backwards(int time) {
-    int mtr_increment = 10;
-    long int start = millis();
-    // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
-    while(millis()-start < time) { // would be line sensor interrupt or so
-        long int old_left_encoder_count = left_encoder_count;
-        long int old_right_encoder_count = right_encoder_count;
+    // Closed loop control
+    int start = millis();
+    // Reset encoder counts
+    left_encoder_count = 0;
+    right_encoder_count = 0;
 
-        while (left_encoder_count < old_left_encoder_count + mtr_increment) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            LeftMotor.drive(-255);
-        }
-//        LeftMotor.brake();
-        while (right_encoder_count < old_right_encoder_count + mtr_increment) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            RightMotor.drive(-153);
-        }
-//        RightMotor.brake();
+    float left_speed = 128;
+    float right_speed = 128;
 
+    double integral = 0;
+    double P = 0.001;
+    double I = 0;
+
+    // Set motor speeds
+    while (millis() - start < time) {
+        LeftMotor.drive((int) -left_speed);
+        RightMotor.drive((int) -right_speed);
+        double error = ((double) (left_encoder_count - right_encoder_count)) / 10;
+        integral += error;
+        right_speed += P * error + I * integral;
+        left_speed -= P * error + I * integral;
+//        if (left_encoder_count > right_encoder_count) {
+//            right_speed += P * error + I * integral;
+//            left_speed -= P * error + I * integral;
+//        }
+//        else if (left_encoder_count < right_encoder_count) {
+//            left_speed += P * error + I * integral;
+//            right_speed -= P * error + I * integral;
+//        }
+//        delay(10);
+        // print encoders and speeds
+
+        Serial.println(String(left_speed) + ", " + String(right_speed));
+//        Serial.print(error);
     }
-    LeftMotor.brake();
-    RightMotor.brake();
 }
 
-void robot_spin_cw(int degrees) { // to the right
+void robot_spin_cw(int degrees) {
     int rotation = degrees * 3840 / 360;
     int some_other_condition = 1; // related to the line sensors
     while ((left_encoder_count < rotation && right_encoder_count < rotation) || (some_other_condition) ) {
@@ -351,7 +474,7 @@ void robot_spin_cw(int degrees) { // to the right
     }
 }
 
-void robot_spin_ccw(int degrees) { // to the left
+void robot_spin_ccw(int degrees) {
     int rotation = degrees * 3840 / 360;
     int some_other_condition = 1; // related to the line sensors
     while ((left_encoder_count < rotation && right_encoder_count < rotation) || (some_other_condition) ) {
@@ -360,75 +483,82 @@ void robot_spin_ccw(int degrees) { // to the left
     }
 }
 
-void robot_stop() {
+void robot_stop(int del) {
     LeftMotor.brake();
     RightMotor.brake();
+    delay(del);
 }
-
-void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
-    switch(line_pos){
-        case -2:
-            //turn a lot left
-            robot_spin_ccw(25);
-            robot_forward(200);
-            break;
-        case -1:
-            //turn a bit left
-            robot_spin_ccw(10);
-            robot_forward(200);
-            break;
-        case 1:
-            //turn a bit right
-            robot_spin_cw(10);
-            robot_forward(200);
-            break;
-        case 2:
-            //turn a lot right
-            robot_spin_cw(25);
-            robot_forward(200);
-            break;
-        case -5:
-            //find the line
-            robot_forward(100);//until case 5
-            break;
-        case 5:
-            //start/stop/right angle
-            horizontalLineCount++;
-            //first 5 should turn to the right, then go straight
-            if (horizontalLineCount == 1){
-                robot_spin_ccw(90);
-                robot_forward(500);
-            }
-            //second 5 should turn to the left, then go straight, then turn left again, then go straight
-            if (horizontalLineCount == 2){
-                robot_stop();
-                robot_spin_ccw(90);
-                robot_forward(1000);
-                robot_stop();
-                robot_spin_ccw(90);
-                robot_forward(500);
-            }
-            //third 5 should turn to the left, then go straight
-            if (horizontalLineCount == 3){
-                robot_spin_ccw(90);
-                robot_forward(100);
-            }
-            //fourth 5 should stop
-            if (horizontalLineCount == 4){
-                robot_stop();
-            }
-            break;
-        default:
-            //go straight
-            robot_forward(200);
-            break;
-    }
-}
+//
+//void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
+//    switch(line_pos){
+//        case -2:
+//            //turn a lot left
+//            robot_spin_ccw(25);
+//            robot_forward(200);
+//            break;
+//        case -1:
+//            //turn a bit left
+//            robot_spin_ccw(10);
+//            robot_forward(200);
+//            break;
+//        case 1:
+//            //turn a bit right
+//            robot_spin_cw(10);
+//            robot_forward(200);
+//            break;
+//        case 2:
+//            //turn a lot right
+//            robot_spin_cw(25);
+//            robot_forward(200);
+//            break;
+//        case -5:
+//            //find the line
+//            robot_forward(100);//until case 5
+//            break;
+//        case 5:
+//            //start/stop/right angle
+//            horizontalLineCount++;
+//            //first 5 should turn to the right, then go straight
+//            if (horizontalLineCount == 1){
+//                robot_spin_ccw(90);
+//                robot_forward(500);
+//            }
+//            //second 5 should turn to the left, then go straight, then turn left again, then go straight
+//            if (horizontalLineCount == 2){
+//                robot_stop();
+//                robot_spin_ccw(90);
+//                robot_forward(1000);
+//                robot_stop();
+//                robot_spin_ccw(90);
+//                robot_forward(500);
+//            }
+//            //third 5 should turn to the left, then go straight
+//            if (horizontalLineCount == 3){
+//                robot_spin_ccw(90);
+//                robot_forward(100);
+//            }
+//            //fourth 5 should stop
+//            if (horizontalLineCount == 4){
+//                robot_stop();
+//            }
+//            break;
+//        default:
+//            //go straight
+//            robot_forward(200);
+//            break;
+//    }
+//}
 
 int i = 0;
 void loop() {
-    robot_forward(1000);
-    robot_backwards(1000);
+    robot_forward(5000);
+    robot_stop(1000);
+//    robot_stop(1000);
+//    robot_backwards(1000);
+//    robot_stop(1000);
+//    robot_stop(1000);
+//    robot_backwards(1000);
+//    robot_stop(1000);
 //    robot_spin_cw(90);
 
 

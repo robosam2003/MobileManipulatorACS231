@@ -55,9 +55,9 @@ double currentAngle3 = 0;
 double armLengths[3] = {65.5, 120, 160};
 double armAngles[3] = {0};
 
-int sensor1Low;
-int sensor2Low;
-int sensor3Low; //booleans for testing whether the sensor is detecting a line (low) or not (high)
+int sensor1High;
+int sensor2High;
+int sensor3High; //booleans for testing whether the sensor is detecting a line (low) or not (high)
 int horizontalLineCount = 0;
 
 Motor LeftMotor(LEFT_MTR_I1, LEFT_MTR_I2, LEFT_MTR_PWM, 1, STBY_PIN); //
@@ -187,71 +187,7 @@ void left_e2_ISR() {
     }
 }
 
-int line_sensor(){
-    int sensorReading1 = analogRead(SENSOR1);
-    int sensorReading2 = analogRead(SENSOR2);
-    int sensorReading3 = analogRead(SENSOR3);
 
-    (sensorReading1 > LINE_SENSED_THRESHOLD) ? sensor1Low = 1 : sensor1Low = 0;
-    (sensorReading2 > LINE_SENSED_THRESHOLD) ? sensor2Low = 1 : sensor2Low = 0;
-    (sensorReading3 > LINE_SENSED_THRESHOLD) ? sensor3Low = 1 : sensor3Low = 0;
-
-    if (sensorReading1 > LINE_SENSED_THRESHOLD){
-        //Serial.println("Sensor 1 reads LOW");
-        sensor1Low = 1;
-    }
-    else{
-        //Serial.println("Sensor 1 reads HIGH");
-        sensor1Low = 0;
-    }
-
-    if (sensorReading2 > LINE_SENSED_THRESHOLD){
-        //Serial.println("Sensor 2 reads LOW");
-        sensor2Low = 1;
-    }
-    else{
-        //Serial.println("Sensor 2 reads HIGH");
-        sensor2Low = 0;
-    }
-
-    if (sensorReading3 > LINE_SENSED_THRESHOLD){
-        //Serial.println("Sensor 3 reads LOW");
-        sensor3Low = 1;
-    }
-    else{
-        //Serial.println("Sensor 3 reads HIGH");
-        sensor3Low = 0;
-    }
-
-    if (sensor1Low && sensor2Low && sensor3Low){
-        Serial.println("Horizontal line found"); // 5
-        return 5;
-    }
-    else if (sensor1Low && sensor2Low){
-        Serial.println("Line is slightly to the right"); // 1
-        return 1;
-    }
-    else if (sensor2Low && sensor3Low){
-        Serial.println("Line is slightly to the left"); // -1
-        return -1;
-    }
-    else if (sensor1Low){
-        Serial.println("Line is to the right"); // 2
-        return 2;
-    }
-    else if (sensor2Low){
-        Serial.println("Line is in the middle"); // 0
-        return 0;
-    }
-    else if (sensor3Low){
-        Serial.println("Line is to the left"); // -2
-        return -2;
-    }
-    else{
-        Serial.println("Line cannot be seen"); // -5
-        return -5;
-    }
-}
 
 
 
@@ -349,7 +285,7 @@ void robot_forward(int time) {
     while (millis()-start < time) {
         loop_start = millis();
         long left_error = reference_speed -  (left_encoder_count - old_left_encoder_count);
-           long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
+        long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
         long pos_diff = left_encoder_count - right_encoder_count;
         old_left_encoder_count = left_encoder_count;
         old_right_encoder_count = right_encoder_count;
@@ -474,66 +410,99 @@ void robot_stop(int del) {
     RightMotor.brake();
     delay(del);
 }
-//
-//void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
-//    switch(line_pos){
-//        case -2:
-//            //turn a lot left
-//            robot_spin_ccw(25);
-//            robot_forward(200);
-//            break;
-//        case -1:
-//            //turn a bit left
-//            robot_spin_ccw(10);
-//            robot_forward(200);
-//            break;
-//        case 1:
-//            //turn a bit right
-//            robot_spin_cw(10);
-//            robot_forward(200);
-//            break;
-//        case 2:
-//            //turn a lot right
-//            robot_spin_cw(25);
-//            robot_forward(200);
-//            break;
-//        case -5:
-//            //find the line
-//            robot_forward(100);//until case 5
-//            break;
-//        case 5:
-//            //start/stop/right angle
-//            horizontalLineCount++;
-//            //first 5 should turn to the right, then go straight
-//            if (horizontalLineCount == 1){
-//                robot_spin_ccw(90);
-//                robot_forward(500);
-//            }
-//            //second 5 should turn to the left, then go straight, then turn left again, then go straight
-//            if (horizontalLineCount == 2){
-//                robot_stop();
-//                robot_spin_ccw(90);
-//                robot_forward(1000);
-//                robot_stop();
-//                robot_spin_ccw(90);
-//                robot_forward(500);
-//            }
-//            //third 5 should turn to the left, then go straight
-//            if (horizontalLineCount == 3){
-//                robot_spin_ccw(90);
-//                robot_forward(100);
-//            }
-//            //fourth 5 should stop
-//            if (horizontalLineCount == 4){
-//                robot_stop();
-//            }
-//            break;
-//        default:
-//            //go straight
-//            robot_forward(200);
-//            break;
-//    }
-//}
+
+void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
+    switch(line_pos){
+        case -2:
+            break;
+        case -1:
+            break;
+        case 1:
+            break;
+        case 2:
+            break;
+        case -5:
+            break;
+        case 5:
+            //first 5 should turn to the right, then go straight
+            if (horizontalLineCount == 1){
+                robot_spin_ccw(90);
+                robot_forward(500);
+            }
+            //second 5 should turn to the left, then go straight, then turn left again, then go straight
+            if (horizontalLineCount == 2){
+                robot_stop(100);
+                robot_spin_ccw(90);
+                robot_forward(1000);
+                robot_stop(100);
+                robot_spin_ccw(90);
+                robot_forward(500);
+            }
+            //third 5 should turn to the left, then go straight
+            if (horizontalLineCount == 3){
+                robot_spin_ccw(90);
+                robot_forward(100);
+            }
+            //fourth 5 should stop
+            if (horizontalLineCount == 4){
+                robot_stop(100);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+void follow_line(){
+    while(1){
+        int sensorReading1 = analogRead(SENSOR1);
+        int sensorReading2 = analogRead(SENSOR2);
+        int sensorReading3 = analogRead(SENSOR3);
+
+        (sensorReading1 > LINE_SENSED_THRESHOLD) ? sensor1High = 1 : sensor1High = 0;
+        (sensorReading2 > LINE_SENSED_THRESHOLD) ? sensor2High = 1 : sensor2High = 0;
+        (sensorReading3 > LINE_SENSED_THRESHOLD) ? sensor3High = 1 : sensor3High = 0;
+
+        if (sensor1High && sensor2High && sensor3High){
+            Serial.println("Horizontal line found"); // 5
+            robot_stop(100);
+        }
+        else if (sensor1High && sensor2High){
+            Serial.println("Line is slightly to the right"); // 1
+            //turn a bit right
+            robot_spin_cw(10);
+            robot_forward(200);
+        }
+        else if (sensor2High && sensor3High){
+            Serial.println("Line is slightly to the left"); // -1
+            //turn a bit left
+            robot_spin_ccw(10);
+            robot_forward(200);
+        }
+        else if (sensor1High){
+            Serial.println("Line is to the right"); // 2
+            //turn a lot right
+            robot_spin_cw(25);
+            robot_forward(200);
+        }
+        else if (sensor2High){
+            Serial.println("Line is in the middle"); // 0
+            //go straight
+            robot_forward(200);
+        }
+        else if (sensor3High){
+            Serial.println("Line is to the left"); // -2
+            //turn a lot left
+            robot_spin_ccw(25);
+            robot_forward(200);
+        }
+        else if (!(sensor1High || sensor2High || sensor3High)){
+            Serial.println("Line cannot be seen"); // -5
+            //find the line
+            robot_forward(100);//until case 5
+        }
+    }
+}
 
 int i = 0;
 void loop() {

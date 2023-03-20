@@ -190,6 +190,7 @@ int line_sensor(){
     int sensorReading2 = analogRead(SENSOR2);
     int sensorReading3 = analogRead(SENSOR3);
 
+
     if (sensorReading1 > LINE_SENSED_THRESHOLD){
         //Serial.println("Sensor 1 reads LOW");
         sensor1Low = 1;
@@ -325,8 +326,8 @@ void robot_forward(int time) {
     left_encoder_count = 0;
     right_encoder_count = 0;
 
-    double left_speed = 0;
-    double right_speed = 0  ;
+    double left_speed = 120;
+    double right_speed = 120  ;
 
     long old_left_encoder_count = left_encoder_count;
     long old_right_encoder_count = right_encoder_count;
@@ -335,14 +336,15 @@ void robot_forward(int time) {
     int loop_time_ms = 10;
     delay(loop_time_ms);
 
-    long reference_speed = (long)(1000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    // 4000 is the MAX for some reason
+    long reference_speed = (long)(4000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
     double Kp = 0.1;
 
     long start = millis();
     while (millis()-start < time) {
         loop_start = millis();
         long left_error = reference_speed -  (left_encoder_count - old_left_encoder_count);
-        long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
+           long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
         long pos_diff = left_encoder_count - right_encoder_count;
         old_left_encoder_count = left_encoder_count;
         old_right_encoder_count = right_encoder_count;
@@ -359,8 +361,8 @@ void robot_forward(int time) {
         LeftMotor.drive(left_speed);
         RightMotor.drive(right_speed);
 //        Serial.print(String(left_error) + " " + String(right_error) + " ");
-//        Serial.println(String(left_speed) + " " + String(right_speed));
-        Serial.println(pos_diff);
+        Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
         delay(loop_time_ms-(millis()-loop_start));
     }
 

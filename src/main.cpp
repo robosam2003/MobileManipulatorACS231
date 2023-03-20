@@ -22,6 +22,15 @@ Servo S3;
 #define RIGHT_MTR_I1 22
 #define RIGHT_MTR_I2 23
 #define RIGHT_MTR_PWM 8
+#define SENSOR1 A0
+#define SENSOR2 A1
+#define SENSOR3 A2 //line sensor pins
+#define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
+                                  //lower to decrease sensitivity
+
+#define RIGHT_MTR_I1
+#define RIGHT_MTR_I2
+#define RIGHT_MTR_PWM
 #define RIGHT_MTR_E1 20
 #define RIGHT_MTR_E2 21
 
@@ -44,6 +53,10 @@ double currentAngle3 = 0;
 
 double armLengths[3] = {65.5, 120, 160};
 double armAngles[3] = {0};
+
+int sensor1Low;
+int sensor2Low;
+int sensor3Low; //booleans for testing whether the sensor is detecting a line (low) or not (high)
 
 Motor LeftMotor(LEFT_MTR_I1, LEFT_MTR_I2, LEFT_MTR_PWM, 1, STBY_PIN); //
 Motor RightMotor(RIGHT_MTR_I1, RIGHT_MTR_I2, RIGHT_MTR_PWM, 1, STBY_PIN); //
@@ -160,7 +173,7 @@ void left_e1_ISR() {
     } else { // e2 == 0
         (e1) ? left_encoder_count++ : left_encoder_count--;
     }
-};
+}
 
 void left_e2_ISR() {
     int e1 = digitalRead(LEFT_MTR_E1);
@@ -170,7 +183,94 @@ void left_e2_ISR() {
     } else { // e1 == 0
         (e2) ? left_encoder_count-- : left_encoder_count++;
     }
-};
+}
+
+int line_sensor(){
+    int sensorReading1 = analogRead(SENSOR1);
+    int sensorReading2 = analogRead(SENSOR2);
+    int sensorReading3 = analogRead(SENSOR3);
+
+    if (sensorReading1 < LINE_SENSED_THRESHOLD){
+        //Serial.println("Sensor 1 reads LOW");
+        sensor1Low = 1;
+    }
+    else{
+        //Serial.println("Sensor 1 reads HIGH");
+        sensor1Low = 0;
+    }
+
+    if (sensorReading2 < LINE_SENSED_THRESHOLD){
+        //Serial.println("Sensor 2 reads LOW");
+        sensor2Low = 1;
+    }
+    else{
+        //Serial.println("Sensor 2 reads HIGH");
+        sensor2Low = 0;
+    }
+
+    if (sensorReading3 < LINE_SENSED_THRESHOLD){
+        //Serial.println("Sensor 3 reads LOW");
+        sensor3Low = 1;
+    }
+    else{
+        //Serial.println("Sensor 3 reads HIGH");
+        sensor3Low = 0;
+    }
+
+    if (sensor1Low && sensor2Low && sensor3Low){
+        Serial.println("Horizontal line found"); // 5
+        return 5;
+    }
+    else if (sensor1Low && sensor2Low){
+        Serial.println("Line is slightly to the right"); // 1
+        return 1;
+    }
+    else if (sensor2Low && sensor3Low){
+        Serial.println("Line is slightly to the left"); // -1
+        return -1;
+    }
+    else if (sensor1Low){
+        Serial.println("Line is to the right"); // 2
+        return 2;
+    }
+    else if (sensor2Low){
+        Serial.println("Line is in the middle"); // 0
+        return 0;
+    }
+    else if (sensor3Low){
+        Serial.println("Line is to the left"); // -2
+        return -2;
+    }
+    else{
+        Serial.println("Line cannot be seen"); // -5
+        return -5;
+    }
+}
+
+void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
+    switch(line_pos){
+        case -2:
+            //turn left
+            break;
+        case -1:
+            //turn left
+            break;
+        case 1:
+            //turn right
+            break;
+        case 2:
+            //turn right
+            break;
+        case -5:
+            //find the line
+            break;
+        case 5:
+            //start/stop
+            break;
+        default:
+            //go straight
+    }
+}
 
 void right_e1_ISR() {
     int e1 = digitalRead(RIGHT_MTR_E1);
@@ -203,6 +303,11 @@ void setup() {
     // Left motor encoders
     pinMode(LEFT_MTR_E1, INPUT);
     pinMode(LEFT_MTR_E2, INPUT);
+
+    pinMode(SENSOR1, INPUT);
+    pinMode(SENSOR2, INPUT);
+    pinMode(SENSOR3, INPUT);
+
     attachInterrupt(digitalPinToInterrupt(LEFT_MTR_E1), left_e1_ISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(LEFT_MTR_E2), left_e2_ISR, CHANGE);
 

@@ -1,10 +1,10 @@
 #include <Arduino.h>
 #include <Servo.h>
-
+#include "SparkFun_TB6612.h"
 // Pi to 20 digits
 #define PI 3.14159265358979323846
 
-
+// Servos
 Servo S1;
 Servo S2;
 Servo S3;
@@ -13,9 +13,25 @@ Servo S3;
 #define S2_PWM 10
 #define S3_PWM 11
 
-#define POT_PIN_1 A0
-#define POT_PIN_2 A1
-#define POT_PIN_3 A2
+#define LEFT_MTR_I1 1
+#define LEFT_MTR_I2 0
+#define LEFT_MTR_PWM 4
+#define LEFT_MTR_E1 2
+#define LEFT_MTR_E2 3
+
+#define RIGHT_MTR_I1
+#define RIGHT_MTR_I2
+#define RIGHT_MTR_PWM
+#define RIGHT_MTR_E1 20
+#define RIGHT_MTR_E2 21
+
+#define STBY_PIN 5
+
+long int left_encoder_count = 0;
+
+//#define POT_PIN_1 A0
+//#define POT_PIN_2 A1
+//#define POT_PIN_3 A2
 
 unsigned long timestamp;
 unsigned long elapsedTime;
@@ -25,52 +41,17 @@ double currentAngle1 = 0;
 double currentAngle2 = 0;
 double currentAngle3 = 0;
 
-double armLengths[3] = {120, 80, 130};
+double armLengths[3] = {65.5, 120, 160};
 double armAngles[3] = {0};
 
+Motor LeftMotor(LEFT_MTR_I1, LEFT_MTR_I2, LEFT_MTR_PWM, 1, STBY_PIN); //
 
 
 #define increment 0.017 // radians per 15ms
 
 
-
-// Number positions
-//double numberPositions[10][3] = {
-//  {-150, 70, 70}, // 0
-//  {-125, 110, 40}, // 1
-//  {-95, 130, 30}, // 2
-//  {-60, 130, 20}, // 3
-//  {-20, 140, 20}, // 4
-//  {15,  140, 20}, // 5
-//  {55,  140, 20}, // 6
-//  {90,  130, 30}, // 7
-//  {130,  120, 45}, // 8
-//  {150,  90, 60}  // 9
-//};
-
-
-
-
 double floatMap(double x, double in_min, double in_max, double out_min, double out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-double rateLimit(double desiredAngle, double &currentAngle) {
-    double positionCommand = 0;
-    if (desiredAngle > currentAngle) {
-        positionCommand = min(desiredAngle, currentAngle + increment);
-        currentAngle = positionCommand;
-    }
-    else if (desiredAngle < currentAngle) {
-        positionCommand = max(desiredAngle, currentAngle - increment);
-        currentAngle = positionCommand;
-    }
-    else {
-        positionCommand = desiredAngle;
-        currentAngle = positionCommand;
-    }
-    return positionCommand;
-
 }
 
 void cartesianToSpherical(double coords[3], double lengths[3], double angles[3]) {
@@ -90,9 +71,6 @@ void cartesianToSpherical(double coords[3], double lengths[3], double angles[3])
     if (l > l1 + l2) {
         // out of reach
         Serial.println("Out of reach");
-        angles[0] = 0;
-        angles[1] = 0;
-        angles[2] = 0;
         return;
     }
     // Base angle
@@ -120,7 +98,6 @@ void cartesianToSpherical(double coords[3], double lengths[3], double angles[3])
 
 }
 
-//this is line 123
 
 void goToPosition(double coords[3]) {
     cartesianToSpherical(coords, armLengths, armAngles);
@@ -131,8 +108,8 @@ void goToPosition(double coords[3]) {
 //        int servoPulseWidth2 = floatMap(rateLimit(armAngles[1], currentAngle2), -PI / 2, PI / 2, 500, 2500);
 //        int servoPulseWidth3 = floatMap(rateLimit(armAngles[2], currentAngle3), PI / 2, -PI / 2, 500, 2500);
         int servoPulseWidth1 = floatMap(armAngles[0], -PI / 2, PI / 2, 500, 2500);
-        int servoPulseWidth2 = floatMap(armAngles[1], -PI / 2, PI / 2, 500, 2500);
-        int servoPulseWidth3 = floatMap(armAngles[2], PI / 2, -PI / 2, 500, 2500);
+        int servoPulseWidth2 = floatMap(armAngles[1]-PI/2, -PI / 2, PI / 2, 500, 2500);
+        int servoPulseWidth3 = floatMap(armAngles[2]+PI/2, -PI / 2, PI / 2, 500, 2500);
 
         S1.writeMicroseconds(servoPulseWidth1);
         S2.writeMicroseconds(servoPulseWidth2);
@@ -159,7 +136,7 @@ void drawStraightLine(double initialPosition[], double endPosition[]) {
     double v_hat[3] = {v[0]/magnitude_v, v[1]/magnitude_v, v[2]/magnitude_v};
 
     // step size
-    double stepSize = 0.05;
+    double stepSize = 0.1;
     // number of steps
     int n = magnitude_v / stepSize;
 
@@ -169,10 +146,30 @@ void drawStraightLine(double initialPosition[], double endPosition[]) {
                               initialPosition[1] + i*stepSize*v_hat[1],
                               initialPosition[2] + i*stepSize*v_hat[2]};
         goToPosition(position);
-        delay(stepSize*5); // or some scalar.
+        delay(stepSize); // or some scalar.
     }
 
 }
+
+void left_e1_ISR() {
+    int e1 = digitalRead(LEFT_MTR_E1);
+    int e2 = digitalRead(LEFT_MTR_E2);
+    if (e2) { // e2 == 1
+        (e1) ? left_encoder_count-- : left_encoder_count++;
+    } else { // e2 == 0
+        (e1) ? left_encoder_count++ : left_encoder_count--;
+    }
+};
+
+void left_e2_ISR() {
+    int e1 = digitalRead(LEFT_MTR_E1);
+    int e2 = digitalRead(LEFT_MTR_E2);
+    if (e1) { // e1 == 1
+        (e2) ? left_encoder_count++ : left_encoder_count--;
+    } else { // e1 == 0
+        (e2) ? left_encoder_count-- : left_encoder_count++;
+    }
+};
 
 void setup() {
     timestamp = millis();
@@ -181,54 +178,78 @@ void setup() {
     S3.attach(S3_PWM);
 
     Serial.begin(9600);
+
+    pinMode(LEFT_MTR_E1, INPUT);
+    pinMode(LEFT_MTR_E2, INPUT);
+
+    attachInterrupt(digitalPinToInterrupt(LEFT_MTR_E1), left_e1_ISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(LEFT_MTR_E2), left_e2_ISR, CHANGE);
+
+
 }
 
-double positions[3][3] = {{0, 120, 240},
-                          {0, 160, 240},
-                          {0, 150, 190}};
+double positions[3][3] = {{0, 90,  250},
+                          {0, 180, 250},
+                          {0, 112, 70}};
 
-void loop() {
-
-
+void Assignment_4_robot_arm() {
+    goToPosition(positions[0]);
+    delay(1000);
     drawStraightLine(positions[0], positions[1]);
-    delay(1000);
     drawStraightLine(positions[1], positions[2]);
-    delay(1000);
-    drawStraightLine(positions[2], positions[1]);
-    delay(1000);
-    drawStraightLine(positions[1], positions[0]);
-    delay(1000);
+    drawStraightLine(positions[2], positions[0]);
+//    drawStraightLine(positions[0], positions[3]);
+//    drawStraightLine(positions[3], positions[4]);
+//    drawStraightLine(positions[4], positions[5]);
+//    drawStraightLine(positions[5], positions[0]);
+    while (1);
     Serial.println("---------------------------------\n\n\n");
 
 
-
-//    while (coords[0] >= -100 ) {
-//        // print coords
-//        Serial.print("X: ");
-//        Serial.print(coords[0]);
-//        Serial.print(" Y: ");
-//        Serial.print(coords[1]);
-//        Serial.print(" Z: ");
-//        Serial.println(coords[2]);
-//
-//        goToPosition(coords);
-//        coords[0] -= (double)100/11;
-//        delay(500);
+}
+int i = 0;
+void loop() {
+    while(abs(left_encoder_count/3840) < i) {
+        LeftMotor.drive(-255);
+        Serial.println((double)left_encoder_count/3840);
+    }
+    LeftMotor.brake();
+    delay(1000);
+    i++;
+//    LeftMotor.drive(255);
+//    for (int i = 0; i < 100; i++) {
+//        Serial.println(left_e1_count);
+//        Serial.println(left_e2_count);
+//        delay(10);
 //    }
-//    Serial.println("---------------------------------\n\n\n");
+//    LeftMotor.brake();
 //    delay(1000);
+//    LeftMotor.drive(-255);
+//    for (int i = 0; i < 100; i++) {
+//        Serial.println(left_e1_count);
+//        Serial.println(left_e2_count);
+//        delay(10);
+//    }
+//    LeftMotor.brake();
+//    delay(1000);
+//    delay(100);
+//    LeftMotor.drive(-128, 1000);
+//    delay(100);
+//    digitalWrite(LED_BUILTIN, HIGH);
+//    delay(1000);
+//    digitalWrite(LED_BUILTIN, LOW);
+
 
 }
 
 
 
 
-//
 //void loop() {
-//
-//    S1.write(0);
-//    S2.write(0);
-//    S3.write(0);
+//    // Homing sequence
+//    S1.write(90);
+//    S2.write(90);
+//    S3.write(180);
 //
 //}
 

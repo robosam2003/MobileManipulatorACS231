@@ -46,3 +46,21 @@
 //
 //    delay(100);
 //}
+
+// double rateLimit(double desiredAngle, double &currentAngle) {
+//    double positionCommand = 0;
+//    if (desiredAngle > currentAngle) {
+//        positionCommand = min(desiredAngle, currentAngle + increment);
+//        currentAngle = positionCommand;
+//    }
+//    else if (desiredAngle < currentAngle) {
+//        positionCommand = max(desiredAngle, currentAngle - increment);
+//        currentAngle = positionCommand;
+//    }
+//    else {
+//        positionCommand = desiredAngle;
+//        currentAngle = positionCommand;
+//    }
+//    return positionCommand;
+//
+//}

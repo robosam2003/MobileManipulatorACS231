@@ -37,6 +37,8 @@ long int right_encoder_count = 0;
 #define LINE_SENSED_THRESHOLD 900 //max value output from line sensors which will be considered as detecting a line,
 //lower to decrease sensitivity
 
+#define WHEEL_DIAMETER_M 0.065 //meters
+#define WHEEL_ROBOT_RADIUS_M 0.08 //meters
 
 //#define POT_PIN_1 A0
 //#define POT_PIN_2 A1
@@ -329,8 +331,8 @@ void robot_forward(int time) {
     left_encoder_count = 0;
     right_encoder_count = 0;
 
-    double left_speed = 120;
-    double right_speed = 120  ;
+    double left_speed = 0;
+    double right_speed = 0;  ;
 
     long old_left_encoder_count = left_encoder_count;
     long old_right_encoder_count = right_encoder_count;
@@ -369,118 +371,102 @@ void robot_forward(int time) {
         delay(loop_time_ms-(millis()-loop_start));
     }
 
-
-
-
-/*    int mtr_increment = 5;
-    long int start = millis();
-    // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
-    while(millis()-start < time) { // would be line sensor interrupt or so
-        long int old_left_encoder_count = left_encoder_count;
-        long int old_right_encoder_count = right_encoder_count;
-
-        while (left_encoder_count < old_left_encoder_count + mtr_increment) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            LeftMotor.drive(255);
-        }
-        LeftMotor.drive(0);
-//        LeftMotor.brake();
-        while (right_encoder_count < old_right_encoder_count + mtr_increment) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-            RightMotor.drive(255);
-        }
-        RightMotor.drive(0);
-//        RightMotor.brake();
-
-    }
-    LeftMotor.brake();
-    RightMotor.brake();*/
-
 }
 
-//
-//void robot_backwards(int time) {
-//    int mtr_increment = 10;
-//    long int start = millis();
-//    // using the encoders to drive the robot forward, the robot needs to drive each motor at the same speed.
-//    while(millis()-start < time) { // would be line sensor interrupt or so
-//        long int old_left_encoder_count = left_encoder_count;
-//        long int old_right_encoder_count = right_encoder_count;
-//
-//        while (left_encoder_count > old_left_encoder_count - mtr_increment) {
-//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-//            LeftMotor.drive(-255);
-//        }
-////        LeftMotor.brake();
-//        while (right_encoder_count > old_right_encoder_count - mtr_increment) {
-//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-//            RightMotor.drive(-153);
-//        }
-////        RightMotor.brake();
-//
-//    }
-//    LeftMotor.brake();
-//        while (right_encoder_count < old_right_encoder_count + mtr_increment) {
-//            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-//            RightMotor.drive(-153);
-//        }
-//    RightMotor.brake();
-//}
 
 void robot_backwards(int time) {
     // Closed loop control
-    int start = millis();
+    long loop_start = millis();
     // Reset encoder counts
     left_encoder_count = 0;
     right_encoder_count = 0;
 
-    float left_speed = 128;
-    float right_speed = 128;
+    double left_speed = 0;
+    double right_speed = 0;
 
-    double integral = 0;
-    double P = 0.001;
-    double I = 0;
+    long old_left_encoder_count = left_encoder_count;
+    long old_right_encoder_count = right_encoder_count;
 
-    // Set motor speeds
+
+    int loop_time_ms = 10;
+    delay(loop_time_ms);
+
+    // 4000 is the MAX for some reason
+    long reference_speed = (long) (-4000.0 * loop_time_ms * 1e-3); // encoder counts per loop_time_ms
+    double Kp = 0.1;
+
+    long start = millis();
     while (millis() - start < time) {
-        LeftMotor.drive((int) -left_speed);
-        RightMotor.drive((int) -right_speed);
-        double error = ((double) (left_encoder_count - right_encoder_count)) / 10;
-        integral += error;
-        right_speed += P * error + I * integral;
-        left_speed -= P * error + I * integral;
-//        if (left_encoder_count > right_encoder_count) {
-//            right_speed += P * error + I * integral;
-//            left_speed -= P * error + I * integral;
-//        }
-//        else if (left_encoder_count < right_encoder_count) {
-//            left_speed += P * error + I * integral;
-//            right_speed -= P * error + I * integral;
-//        }
-//        delay(10);
-        // print encoders and speeds
+        loop_start = millis();
+        long left_error = reference_speed - (left_encoder_count - old_left_encoder_count);
+        long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
+        long pos_diff = left_encoder_count - right_encoder_count;
+        old_left_encoder_count = left_encoder_count;
+        old_right_encoder_count = right_encoder_count;
 
-        Serial.println(String(left_speed) + ", " + String(right_speed));
-//        Serial.print(error);
+
+        left_speed += Kp * (double) left_error;
+        right_speed += Kp * (double) right_error;
+
+        // saturate speed
+        left_speed = constrain(left_speed, -255, 255);
+        right_speed = constrain(right_speed, -255, 255);
+
+
+        LeftMotor.drive(left_speed);
+        RightMotor.drive(right_speed);
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+        Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+        delay(loop_time_ms - (millis() - loop_start));
     }
 }
 
 void robot_spin_cw(int degrees) {
-    int rotation = degrees * 3840 / 360;
+    left_encoder_count = 0;
+    right_encoder_count = 0;
+    double distance_to_travel = (2.0*PI*WHEEL_ROBOT_RADIUS_M * (degrees / 360.0));
+    double rotation = 3840.0 * (distance_to_travel / (PI*WHEEL_DIAMETER_M));
+//    double rotation = 3840 * (degrees / 360.0);
     int some_other_condition = 1; // related to the line sensors
-    while ((left_encoder_count < rotation && right_encoder_count < rotation) || (some_other_condition) ) {
-        LeftMotor.drive(255);
-        RightMotor.drive(-153);
+    LeftMotor.drive(120);
+    RightMotor.drive(-120);
+    while ((abs(left_encoder_count) < rotation || abs(right_encoder_count) < rotation) && (some_other_condition) ) {
+        Serial.println(left_encoder_count);
+        if (abs(left_encoder_count) > rotation) {
+            LeftMotor.brake();
+        }
+        if (abs(right_encoder_count) > rotation) {
+            RightMotor.brake();
+        }
     }
+    LeftMotor.brake();
+    RightMotor.brake();
 }
 
 void robot_spin_ccw(int degrees) {
-    int rotation = degrees * 3840 / 360;
+    left_encoder_count = 0;
+    right_encoder_count = 0;
+    double distance_to_travel = (2.0*PI*WHEEL_ROBOT_RADIUS_M * (degrees / 360.0));
+    double rotation = 3840.0 * (distance_to_travel / (PI*WHEEL_DIAMETER_M));
+
     int some_other_condition = 1; // related to the line sensors
-    while ((left_encoder_count < rotation && right_encoder_count < rotation) || (some_other_condition) ) {
-        LeftMotor.drive(-255);
-        RightMotor.drive(153);
+    LeftMotor.drive(-120);
+    RightMotor.drive(120);
+    while (((abs(left_encoder_count) < rotation) || (abs(right_encoder_count) < rotation)) && (some_other_condition) ) {
+        Serial.println(left_encoder_count);
+        if (abs(left_encoder_count) > rotation) {
+            LeftMotor.brake();
+        }
+        if (abs(right_encoder_count) > rotation) {
+            RightMotor.brake();
+        }
     }
+    LeftMotor.brake();
+    RightMotor.brake();
+    // pring encoder counts
+//    Serial.println("THE ENCODER COUNTS END UP BEING: " + String(left_encoder_count) + " " + String(right_encoder_count));
+//    Serial.println("ROTATION WAS:    " + String(rotation));
 }
 
 void robot_stop(int del) {
@@ -551,15 +537,14 @@ void robot_stop(int del) {
 
 int i = 0;
 void loop() {
-    robot_forward(5000);
+//    robot_forward(5000);
+//    robot_stop(1000);
+//    robot_backwards(5000);
+    robot_spin_cw(90);
     robot_stop(1000);
-//    robot_stop(1000);
-//    robot_backwards(1000);
-//    robot_stop(1000);
-//    robot_stop(1000);
-//    robot_backwards(1000);
-//    robot_stop(1000);
-//    robot_spin_cw(90);
+    robot_spin_ccw(90);
+    robot_stop(1000);
+
 
 
 

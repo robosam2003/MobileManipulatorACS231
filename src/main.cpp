@@ -188,32 +188,9 @@ int line_sensor(){
     int sensorReading2 = analogRead(SENSOR2);
     int sensorReading3 = analogRead(SENSOR3);
 
-    if (sensorReading1 > LINE_SENSED_THRESHOLD){
-        //Serial.println("Sensor 1 reads LOW");
-        sensor1Low = 1;
-    }
-    else{
-        //Serial.println("Sensor 1 reads HIGH");
-        sensor1Low = 0;
-    }
-
-    if (sensorReading2 > LINE_SENSED_THRESHOLD){
-        //Serial.println("Sensor 2 reads LOW");
-        sensor2Low = 1;
-    }
-    else{
-        //Serial.println("Sensor 2 reads HIGH");
-        sensor2Low = 0;
-    }
-
-    if (sensorReading3 > LINE_SENSED_THRESHOLD){
-        //Serial.println("Sensor 3 reads LOW");
-        sensor3Low = 1;
-    }
-    else{
-        //Serial.println("Sensor 3 reads HIGH");
-        sensor3Low = 0;
-    }
+    (sensorReading1 > LINE_SENSED_THRESHOLD) ? sensor1Low = 1 : sensor1Low = 0;
+    (sensorReading2 > LINE_SENSED_THRESHOLD) ? sensor2Low = 1 : sensor2Low = 0;
+    (sensorReading3 > LINE_SENSED_THRESHOLD) ? sensor3Low = 1 : sensor3Low = 0;
 
     if (sensor1Low && sensor2Low && sensor3Low){
         Serial.println("Horizontal line found"); // 5

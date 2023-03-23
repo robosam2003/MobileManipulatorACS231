@@ -299,7 +299,7 @@ void robot_brake(int del) {
     delay(del);
 }
 
-void robot_forward(double distance_to_travel_m, bool until_line) {
+void robot_forward(double distance_to_travel_m, bool until_line, bool stop_on_horisontal) {
     Serial.println("ROBOT FORWARDS");
 
     // Closed loop control
@@ -353,12 +353,12 @@ void robot_forward(double distance_to_travel_m, bool until_line) {
 
 
             line_sensor_reading = read_line_sensors();
-            int a = 200;
+            int a = 400;
             double b = 1.5;
             switch (line_sensor_reading) {
                 case (0b000):
-                    reference_speed_left = (VBase * loop_time_ms * 1e-3);
-                    reference_speed_right = (VBase * loop_time_ms * 1e-3);
+//                    reference_speed_left = (VBase * loop_time_ms * 1e-3);
+//                    reference_speed_right = (VBase * loop_time_ms * 1e-3);
                     break;
                 case (0b010):
                     reference_speed_left = (VBase * loop_time_ms * 1e-3);
@@ -381,8 +381,10 @@ void robot_forward(double distance_to_travel_m, bool until_line) {
                     reference_speed_right =((VBase + a*b) * loop_time_ms * 1e-3);
                     break;
                 case (0b111): // if we see the horisontal line, stop
-                    robot_brake(100);
-                    return;
+                    if (stop_on_horisontal){
+                        robot_brake(100);
+                        return;
+                    }
             }
             delay(loop_time_ms - (millis() - loop_start));
 
@@ -415,6 +417,8 @@ void robot_forward(double distance_to_travel_m, bool until_line) {
             delay(loop_time_ms - (millis() - loop_start));
         }
     }
+
+    robot_brake(100);
 }
 
 void robot_backwards(double distance_to_travel_m) {
@@ -600,7 +604,8 @@ void robot_spin_ccw(int degrees, bool until_line) {
 //        Serial.println(pos_diff);
             delay(loop_time_ms-(millis()-loop_start));
         }
-    } else {
+    }
+    else {
         while(read_line_sensors() != 0b010){
             loop_start = millis();
             long left_error = reference_speed_left -  (left_encoder_count - old_left_encoder_count);
@@ -617,8 +622,8 @@ void robot_spin_ccw(int degrees, bool until_line) {
             left_speed = constrain(left_speed, -255, 255);
             right_speed = constrain(right_speed, -255, 255);
 
-            (abs(left_encoder_count)<rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
-            (abs(right_encoder_count)<rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+            LeftMotor.drive(left_speed) ; // should we brake here?
+            RightMotor.drive(right_speed);
 
 //        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
 //        Serial.print(String(left_error) + " " + String(right_error) + " ");
@@ -727,7 +732,7 @@ void loop() {
     // Start
 //    robot_spin_cw(90, false);
 //    robot_brake(500);
-    robot_forward(1, false); // bottom
+//    robot_forward(1, false); // bottom
 //    robot_brake(500);
 //    robot_forward(WHEEL_ROBOT_RADIUS_M, false); // bottom.
 //    robot_spin_ccw(90, true);
@@ -738,16 +743,26 @@ void loop() {
 
 //    Serial.println(read_line_sensors(), BIN);
 //    delay(10);
+    int a = 1000; // ms
+
     // Start
-    robot_spin_cw(90, false);
-    robot_forward(0.7, true); // bottom
-    robot_spin_ccw(90, false);
-    robot_forward(0.7); // right
-    robot_spin_ccw(90, false);
-    robot_forward(0.7); // top
-    robot_spin_ccw(90, false);
-    robot_forward(0.7); // left
-    while(1);
+    delay(6000);
+
+//    robot_spin_ccw(0, true); delay(a);// turn until line
+//    robot_forward(0.7, false, true); delay(a);// RIGHT: drive 0.7m, following line.
+
+    robot_spin_cw(85, false); delay(a);
+    robot_forward(0, true, false);  delay(a);// BOTTOM: drive, until line.
+    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a); // BOTTOM: inch forward a bit
+    robot_spin_ccw(0, true); delay(a);// turn until line
+    robot_forward(0.7, false, true); delay(a);// RIGHT: drive 0.7m, following line.
+    robot_spin_ccw(85, false); delay(a); // turn 90 degrees.
+    robot_forward(0, true, false); delay(a); // TOP: drive until line
+    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a);// TOP: inch forward a bit
+    robot_spin_ccw(0, true); delay(a);// turn until line
+    robot_forward(0.7, false, true); delay(a);// LEFT: drive 0.7m, following line.
+    robot_brake(a);
+    while(1); // ST
 
 
 }

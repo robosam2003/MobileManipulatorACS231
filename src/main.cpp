@@ -30,6 +30,9 @@ Servo S3;
 long int left_encoder_count = 0;
 long int right_encoder_count = 0;
 
+double VBase = 3000.0; // encoder counts per second
+
+
 
 #define SENSOR1 A0
 #define SENSOR2 A1
@@ -238,55 +241,65 @@ void right_e2_ISR() {
     }
 };
 
-void follow_line() {
+//void follow_line(double distance_to_travel_m) {
+//
+//    left_encoder_count = 0;
+//    right_encoder_count = 0;
+//
+//    int left_speed = 60;
+//    int right_speed = 60;
+//
+//
+//    double rotation = COUNTS_PER_REVOLUTION * (abs(distance_to_travel_m) / (PI * WHEEL_DIAMETER_M));
+//
+//    double Kp = 3;
+//    double minor_gain = 1;
+//    double major_gain = 2;
+//
+//    byte line_sensor_reading = read_line_sensors();
+//
+//    while (line_sensor_reading != 0b111 && (abs(left_encoder_count) < rotation || abs(right_encoder_count) < rotation)) {
+//        switch (line_sensor_reading) {
+//            case (0b000):
+////                LeftMotor.drive(0);
+////                RightMotor.drive(0);
+//                break;
+//            case (0b010):
+//                break;
+//            case (0b011):
+//                left_speed += Kp * minor_gain;
+//                right_speed -= Kp * minor_gain;
+//                break;
+//            case(0b001):
+//                left_speed += Kp * major_gain;
+//                right_speed -= Kp * major_gain;
+//                break;
+//            case (0b110):
+//                left_speed -= Kp * minor_gain;
+//                right_speed += Kp * minor_gain;
+//                break;
+//            case (0b100):
+//                left_speed -= Kp * major_gain;
+//                right_speed += Kp * major_gain;
+//                break;
+//
+//        }
+//
+//        LeftMotor.drive(left_speed);
+//        RightMotor.drive(right_speed);
+//        delay(10);
+//        line_sensor_reading = read_line_sensors();
+//    }
+//
+//}
 
-    left_encoder_count = 0;
-    right_encoder_count = 0;
-
-    int left_speed = 120;
-    int right_speed = 120;
-    LeftMotor.drive(left_speed);
-    RightMotor.drive(right_speed);
-
-    double Kp = 1;
-    double minor_gain = 10;
-    double major_gain = 100;
-
-    byte line_sensor_reading = read_line_sensors();
-
-    while (line_sensor_reading != 0b111) {
-        switch (line_sensor_reading) {
-            case (0b000):
-                LeftMotor.drive(0);
-                RightMotor.drive(0);
-                return;
-            case (0b010):
-                break;
-            case (0b011):
-                left_speed += Kp * minor_gain;
-                right_speed -= Kp * minor_gain;
-                break;
-            case(0b001):
-                left_speed += Kp * major_gain;
-                right_speed -= Kp * major_gain;
-                break;
-            case (0b110):
-                left_speed -= Kp * minor_gain;
-                right_speed += Kp * minor_gain;
-                break;
-            case (0b100):
-                left_speed -= Kp * major_gain;
-                right_speed += Kp * major_gain;
-                break;
-
-        }
-    }
-
-    // switch case
-
+void robot_brake(int del) {
+    LeftMotor.brake();
+    RightMotor.brake();
+    delay(del);
 }
 
-void robot_forward(double distance_to_travel_m) {
+void robot_forward(double distance_to_travel_m, bool until_line) {
     Serial.println("ROBOT FORWARDS");
 
     // Closed loop control
@@ -305,36 +318,102 @@ void robot_forward(double distance_to_travel_m) {
 
     int loop_time_ms = 10;
     delay(loop_time_ms);
+    byte line_sensor_reading = read_line_sensors();
+
 
     // 4000 is the MAX for some reason
-    long reference_speed = (long)(2000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    double reference_speed_left = (VBase * loop_time_ms * 1e-3); // encoder counts per loop_time_ms
+    double reference_speed_right = (VBase * loop_time_ms * 1e-3); // encoder counts per loop_time_ms
     double Kp = 0.1;
+    if (!until_line) {
+        while ((abs(left_encoder_count) < rotation) && (abs(right_encoder_count) < rotation)) {
+            loop_start = millis();
+            double left_error = reference_speed_left - (left_encoder_count - old_left_encoder_count);
+            double right_error = reference_speed_right - (right_encoder_count - old_right_encoder_count);
+            long pos_diff = left_encoder_count - right_encoder_count;
+            old_left_encoder_count = left_encoder_count;
+            old_right_encoder_count = right_encoder_count;
 
-    long start = millis();
-    while ((left_encoder_count<rotation) && (right_encoder_count<rotation)) { // until any sensors are triggered.
-        loop_start = millis();
-        long left_error = reference_speed -  (left_encoder_count - old_left_encoder_count);
-        long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
-        long pos_diff = left_encoder_count - right_encoder_count;
-        old_left_encoder_count = left_encoder_count;
-        old_right_encoder_count = right_encoder_count;
+            // Update speeds - proportional control
+            left_speed += Kp * left_error;
+            right_speed += Kp *  right_error;
 
-        // Update speeds - proportional control
-        left_speed += Kp * (double)left_error;
-        right_speed += Kp * (double)right_error;
+            // saturate speed
+            left_speed = constrain(left_speed, -255, 255);
+            right_speed = constrain(right_speed, -255, 255);
 
-        // saturate speed
-        left_speed = constrain(left_speed, -255, 255);
-        right_speed = constrain(right_speed, -255, 255);
-
-        (left_encoder_count<rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
-        (right_encoder_count<rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+            (abs(left_encoder_count < rotation)) ? LeftMotor.drive((int)left_speed) : LeftMotor.drive(0); // should we brake here?
+            (abs(right_encoder_count < rotation)) ? RightMotor.drive((int)right_speed) : RightMotor.drive(0);
 
 //        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
 //        Serial.print(String(left_error) + " " + String(right_error) + " ");
-        Serial.println(String(left_speed) + " " + String(right_speed));
+//            Serial.println(String(left_speed) + " " + String(right_speed));
+            Serial.println(String(reference_speed_left) + " " + String(reference_speed_right));
 //        Serial.println(pos_diff);
-        delay(loop_time_ms-(millis()-loop_start));
+
+
+            line_sensor_reading = read_line_sensors();
+            int a = 200;
+            double b = 1.5;
+            switch (line_sensor_reading) {
+                case (0b000):
+                    reference_speed_left = (VBase * loop_time_ms * 1e-3);
+                    reference_speed_right = (VBase * loop_time_ms * 1e-3);
+                    break;
+                case (0b010):
+                    reference_speed_left = (VBase * loop_time_ms * 1e-3);
+                    reference_speed_right = (VBase * loop_time_ms * 1e-3);
+                    break;
+                case (0b011):
+                    reference_speed_left = ((VBase + a) * loop_time_ms * 1e-3);
+                    reference_speed_right =((VBase - a) * loop_time_ms * 1e-3);
+                    break;
+                case(0b001):
+                    reference_speed_left =  ((VBase + a*b) * loop_time_ms * 1e-3);
+                    reference_speed_right = ((VBase - a*b) * loop_time_ms * 1e-3);
+                    break;
+                case (0b110):
+                    reference_speed_left =  ((VBase - a) * loop_time_ms * 1e-3);
+                    reference_speed_right = ((VBase + a) * loop_time_ms * 1e-3);
+                    break;
+                case (0b100):
+                    reference_speed_left = ((VBase - a*b) * loop_time_ms * 1e-3);
+                    reference_speed_right =((VBase + a*b) * loop_time_ms * 1e-3);
+                    break;
+                case (0b111): // if we see the horisontal line, stop
+                    robot_brake(100);
+                    return;
+            }
+            delay(loop_time_ms - (millis() - loop_start));
+
+        }
+    }
+    else {
+        while (!read_line_sensors()) { // until any sensors are triggered.
+            loop_start = millis();
+            long left_error = reference_speed_left - (left_encoder_count - old_left_encoder_count);
+            long right_error = reference_speed_right - (right_encoder_count - old_right_encoder_count);
+            long pos_diff = left_encoder_count - right_encoder_count;
+            old_left_encoder_count = left_encoder_count;
+            old_right_encoder_count = right_encoder_count;
+
+            // Update speeds - proportional control
+            left_speed += Kp * (double) left_error;
+            right_speed += Kp * (double) right_error;
+
+            // saturate speed
+            left_speed = constrain(left_speed, -255, 255);
+            right_speed = constrain(right_speed, -255, 255);
+
+            LeftMotor.drive(left_speed);
+            RightMotor.drive(right_speed);
+
+//        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+            Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+            delay(loop_time_ms - (millis() - loop_start));
+        }
     }
 }
 
@@ -362,7 +441,7 @@ void robot_backwards(double distance_to_travel_m) {
     double Kp = 0.1;
 
     long start = millis();
-    while ((left_encoder_count>rotation) && (right_encoder_count>rotation)) { // until any sensors are triggered.
+    while ((abs(left_encoder_count)>rotation) && (abs(right_encoder_count)>rotation)) { // until any sensors are triggered.
         loop_start = millis();
         long left_error = reference_speed -  (left_encoder_count - old_left_encoder_count);
         long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
@@ -378,8 +457,8 @@ void robot_backwards(double distance_to_travel_m) {
         left_speed = constrain(left_speed, -255, 255);
         right_speed = constrain(right_speed, -255, 255);
 
-        (left_encoder_count>rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
-        (right_encoder_count>rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+        (abs(left_encoder_count)>rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
+        (abs(right_encoder_count)>rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
 
 //        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
 //        Serial.print(String(left_error) + " " + String(right_error) + " ");
@@ -392,35 +471,79 @@ void robot_backwards(double distance_to_travel_m) {
 void robot_spin_cw(int degrees, bool until_line) {
     left_encoder_count = 0;
     right_encoder_count = 0;
+
     double distance_to_travel = (2.0*PI*WHEEL_ROBOT_RADIUS_M * (degrees / 360.0));
     double rotation = COUNTS_PER_REVOLUTION * (distance_to_travel / (PI*WHEEL_DIAMETER_M));
 //    double rotation = COUNTS_PER_REVOLUTION * (degrees / 360.0);
-    int some_other_condition = 1; // related to the line sensors
-    LeftMotor.drive(68);
-    RightMotor.drive(-76);
+
+    long loop_start = millis();
+
+    double left_speed = 0;
+    double right_speed = 0;
+
+    long old_left_encoder_count = left_encoder_count;
+    long old_right_encoder_count = right_encoder_count;
+
+    int loop_time_ms = 10;
+    delay(loop_time_ms);
+
+    // 4000 is the MAX for some reason
+    long reference_speed_left = (long)(2000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    long reference_speed_right = (long)(-2000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    double Kp = 0.1;
+
     if (!until_line) {
         while ((abs(left_encoder_count) < rotation || abs(right_encoder_count) < rotation)) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + "    ROTATION: " +
-                           String(rotation));
-            Serial.println(left_encoder_count);
-            if (abs(left_encoder_count) > rotation) {
-                LeftMotor.brake();
-            }
-            if (abs(right_encoder_count) > rotation) {
-                RightMotor.brake();
-            }
+            loop_start = millis();
+            long left_error = reference_speed_left -  (left_encoder_count - old_left_encoder_count);
+            long right_error = reference_speed_right - (right_encoder_count - old_right_encoder_count);
+            long pos_diff = left_encoder_count - right_encoder_count;
+            old_left_encoder_count = left_encoder_count;
+            old_right_encoder_count = right_encoder_count;
+
+            // Update speeds - proportional control
+            left_speed += Kp * (double)left_error;
+            right_speed += Kp * (double)right_error;
+
+            // saturate speed
+            left_speed = constrain(left_speed, -255, 255);
+            right_speed = constrain(right_speed, -255, 255);
+
+            (abs(left_encoder_count)<rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
+            (abs(right_encoder_count)<rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+
+//        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+            Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+            delay(loop_time_ms-(millis()-loop_start));
         }
-    } else {
+    }
+    else {
         while(read_line_sensors() != 0b010){
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + "    ROTATION: " +
-                           String(rotation));
-            Serial.println(left_encoder_count);
-            if (abs(left_encoder_count) > rotation) {
-                LeftMotor.brake();
-            }
-            if (abs(right_encoder_count) > rotation) {
-                RightMotor.brake();
-            }
+            loop_start = millis();
+            long left_error = reference_speed_left -  (left_encoder_count - old_left_encoder_count);
+            long right_error = reference_speed_right - (right_encoder_count - old_right_encoder_count);
+            long pos_diff = left_encoder_count - right_encoder_count;
+            old_left_encoder_count = left_encoder_count;
+            old_right_encoder_count = right_encoder_count;
+
+            // Update speeds - proportional control
+            left_speed += Kp * (double)left_error;
+            right_speed += Kp * (double)right_error;
+
+            // saturate speed
+            left_speed = constrain(left_speed, -255, 255);
+            right_speed = constrain(right_speed, -255, 255);
+
+            (abs(left_encoder_count)<rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
+            (abs(right_encoder_count)<rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+
+//        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+            Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+            delay(loop_time_ms-(millis()-loop_start));
         }
     }
     LeftMotor.brake();
@@ -430,44 +553,85 @@ void robot_spin_cw(int degrees, bool until_line) {
 void robot_spin_ccw(int degrees, bool until_line) {
     left_encoder_count = 0;
     right_encoder_count = 0;
+
     double distance_to_travel = (2.0*PI*WHEEL_ROBOT_RADIUS_M * (degrees / 360.0));
     double rotation = COUNTS_PER_REVOLUTION * (distance_to_travel / (PI*WHEEL_DIAMETER_M));
 //    double rotation = COUNTS_PER_REVOLUTION * (degrees / 360.0);
-    int some_other_condition = 1; // related to the line sensors
-    LeftMotor.drive(-67);
-    RightMotor.drive(76);
+
+    long loop_start = millis();
+
+    double left_speed = 0;
+    double right_speed = 0;
+
+    long old_left_encoder_count = left_encoder_count;
+    long old_right_encoder_count = right_encoder_count;
+
+    int loop_time_ms = 10;
+    delay(loop_time_ms);
+
+    // 4000 is the MAX for some reason
+    long reference_speed_left = (long)(-2000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    long reference_speed_right = (long)(2000.0 * loop_time_ms*1e-3); // encoder counts per loop_time_ms
+    double Kp = 0.1;
+
     if (!until_line) {
-        while ((abs(left_encoder_count) < rotation || abs(right_encoder_count) < rotation) && (some_other_condition)) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + "    ROTATION: " +
-                           String(rotation));
-            if (abs(left_encoder_count) > rotation) {
-                LeftMotor.brake();
-            }
-            if (abs(right_encoder_count) > rotation) {
-                RightMotor.brake();
-            }
+        while ((abs(left_encoder_count) < rotation || abs(right_encoder_count) < rotation)) {
+            loop_start = millis();
+            long left_error = reference_speed_left -  (left_encoder_count - old_left_encoder_count);
+            long right_error = reference_speed_right - (right_encoder_count - old_right_encoder_count);
+            long pos_diff = left_encoder_count - right_encoder_count;
+            old_left_encoder_count = left_encoder_count;
+            old_right_encoder_count = right_encoder_count;
+
+            // Update speeds - proportional control
+            left_speed += Kp * (double)left_error;
+            right_speed += Kp * (double)right_error;
+
+            // saturate speed
+            left_speed = constrain(left_speed, -255, 255);
+            right_speed = constrain(right_speed, -255, 255);
+
+            (abs(left_encoder_count)<rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
+            (abs(right_encoder_count)<rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+
+//        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+            Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+            delay(loop_time_ms-(millis()-loop_start));
         }
     } else {
-        while (read_line_sensors() != 0b010) {
-            Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + "    ROTATION: " +
-                           String(rotation));
-            if (abs(left_encoder_count) > rotation) {
-                LeftMotor.brake();
-            }
-            if (abs(right_encoder_count) > rotation) {
-                RightMotor.brake();
-            }
+        while(read_line_sensors() != 0b010){
+            loop_start = millis();
+            long left_error = reference_speed_left -  (left_encoder_count - old_left_encoder_count);
+            long right_error = reference_speed_right - (right_encoder_count - old_right_encoder_count);
+            long pos_diff = left_encoder_count - right_encoder_count;
+            old_left_encoder_count = left_encoder_count;
+            old_right_encoder_count = right_encoder_count;
+
+            // Update speeds - proportional control
+            left_speed += Kp * (double)left_error;
+            right_speed += Kp * (double)right_error;
+
+            // saturate speed
+            left_speed = constrain(left_speed, -255, 255);
+            right_speed = constrain(right_speed, -255, 255);
+
+            (abs(left_encoder_count)<rotation) ? LeftMotor.drive(left_speed) : LeftMotor.drive(0); // should we brake here?
+            (abs(right_encoder_count)<rotation) ? RightMotor.drive(right_speed) : RightMotor.drive(0);
+
+//        Serial.println(String(left_encoder_count) + " " + String(right_encoder_count) + " " + String(rotation));
+//        Serial.print(String(left_error) + " " + String(right_error) + " ");
+            Serial.println(String(left_speed) + " " + String(right_speed));
+//        Serial.println(pos_diff);
+            delay(loop_time_ms-(millis()-loop_start));
         }
     }
     LeftMotor.brake();
     RightMotor.brake();
 }
 
-void robot_brake(int del) {
-    LeftMotor.brake();
-    RightMotor.brake();
-    delay(del);
-}
+
 
 //void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
 //    switch(line_pos){
@@ -558,7 +722,37 @@ void setup() {
 
 }
 
+
 void loop() {
+    // Start
+//    robot_spin_cw(90, false);
+//    robot_brake(500);
+    robot_forward(1, false); // bottom
+//    robot_brake(500);
+//    robot_forward(WHEEL_ROBOT_RADIUS_M, false); // bottom.
+//    robot_spin_ccw(90, true);
+//    follow_line();
+//
+//    robot_spin_ccw(90, true);
+//    robot_brake(1000);
+
+//    Serial.println(read_line_sensors(), BIN);
+//    delay(10);
+    // Start
+    robot_spin_cw(90, false);
+    robot_forward(0.7, true); // bottom
+    robot_spin_ccw(90, false);
+    robot_forward(0.7); // right
+    robot_spin_ccw(90, false);
+    robot_forward(0.7); // top
+    robot_spin_ccw(90, false);
+    robot_forward(0.7); // left
+    while(1);
+
+
+}
+
+void testingLoop() {
 //    robot_forward(0.3);
 //    robot_brake(1000);
 //    robot_backwards(0.3);

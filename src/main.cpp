@@ -137,9 +137,7 @@ void servosToAngles(double angles[3]) {
         S1.writeMicroseconds(servoPulseWidth1);
         S2.writeMicroseconds(servoPulseWidth2);
         S3.writeMicroseconds(servoPulseWidth3);
-
-
-};
+}
 
 void goToPosition(double coords[3]) {
     cartesianToSpherical(coords, armLengths, armAngles);
@@ -162,7 +160,7 @@ void drawStraightLine(double initialPosition[], double endPosition[]) {
     double v_hat[3] = {v[0]/magnitude_v, v[1]/magnitude_v, v[2]/magnitude_v};
 
     // step size
-    double stepSize = 0.1;
+    double stepSize = 1;
     // number of steps
     int n = magnitude_v / stepSize;
 
@@ -172,7 +170,7 @@ void drawStraightLine(double initialPosition[], double endPosition[]) {
                               initialPosition[1] + i*stepSize*v_hat[1],
                               initialPosition[2] + i*stepSize*v_hat[2]};
         goToPosition(position);
-        delay(stepSize); // or some scalar.
+        delay((static_cast<int>(stepSize)));
     }
 
 }
@@ -182,7 +180,7 @@ double positions[3][3] = {{0, 90,  250},
                           {0, 112, 70}};
 // arm lengths - {65.5, 120, 160}
 
-double foldedPosition[3] = {0, 32, 115.5};
+double foldedPosition[3] = {0, 0, 125};
 
 
 
@@ -192,13 +190,15 @@ double foldedPosition[3] = {0, 32, 115.5};
 void fold_arm() {
     // forward kinematics on these angles to get the position
     goToPosition(foldedPosition);
+    delay(500);
+
     // then move to that position.
-//    S1.write(80);
-//    delay(500);
-//    S3.write(0);
-//    delay(500);
-//    S2.write(175);
-//    delay(500);
+    S1.write(80);
+    delay(500);
+    S3.write(0);
+    delay(500);
+    S2.write(175);
+    delay(500);
 
 
 }
@@ -206,9 +206,10 @@ void fold_arm() {
 
 double positions2[6][3] = {{0, 90,  250}, // away
                            {0, 200, 250}, // top
-                           {0, 130, 70}, //bottom
-                            {120, 150, 120}, //right
-                            {-120, 150, 120}}; //left
+                           {0, 130, 60}, //bottom
+                            {100, 160, 120}, //right
+                            {0, 150, 120}, // middle
+                            {-100, 175, 120}}; //left
 
 void Assignment_4_robot_arm() {
     goToPosition(positions[0]);
@@ -326,11 +327,12 @@ void Assignment_6_robot_arm() {
 //    goToPosition(positions2[0]);
 //    drawStraightLine(foldedPosition, positions2[0]);
     fold_arm();
-    delay(1000);
-    foldedToDrawing();
-    delay(1000);
+//    delay(1000);
+//    foldedToDrawing();
+//    delay(1000);
 
     //vertical line triangle
+    drawStraightLine(foldedPosition, positions2[0]);
     drawStraightLine(positions2[0], positions2[1]);
     drawStraightLine(positions2[1], positions2[2]);
     drawStraightLine(positions2[2], positions2[0]);
@@ -338,10 +340,12 @@ void Assignment_6_robot_arm() {
     //horizontal line triangle
     drawStraightLine(positions2[0], positions2[3]);
     drawStraightLine(positions2[3], positions2[4]);
-    drawStraightLine(positions2[4], positions2[0]);
+    drawStraightLine(positions2[4], positions2[5]);
+    drawStraightLine(positions2[5], positions2[0]);
+    drawStraightLine(positions2[0], foldedPosition);
 //    drawStraightLine(positions2[0], foldedPosition);
-    delay(1000);
-    drawingToFolded();
+//    delay(1000);
+//    drawingToFolded();
     fold_arm();
     Serial.println("---------------------------------\n\n\n");
 
@@ -602,7 +606,7 @@ void robot_backwards(double distance_to_travel_m) {
     double Kp = 0.1;
 
     long start = millis();
-    while ((abs(left_encoder_count)>rotation) && (abs(right_encoder_count)>rotation)) { // until any sensors are triggered.
+    while ((abs(left_encoder_count) < abs(rotation)) && (abs(right_encoder_count) < abs(rotation))) { // until any sensors are triggered.
         loop_start = millis();
         long left_error = reference_speed -  (left_encoder_count - old_left_encoder_count);
         long right_error = reference_speed - (right_encoder_count - old_right_encoder_count);
@@ -627,6 +631,8 @@ void robot_backwards(double distance_to_travel_m) {
 //        Serial.println(pos_diff);
         delay(loop_time_ms-(millis()-loop_start));
     }
+    LeftMotor.brake();
+    RightMotor.brake();
 }
 
 void robot_spin_cw(int degrees, bool until_line) {
@@ -823,66 +829,53 @@ void setup() {
     attachInterrupt(digitalPinToInterrupt(RIGHT_MTR_E2), right_e2_ISR, CHANGE);
 }
 
-void loop() {
-    fold_arm();
-    delay(1000);
-    Assignment_6_robot_arm();
-//    delay(1000);
-
-}
-
-//S3.write(90);
-//    S1.write(0);
-//    delay(1000);
-//    S1.write(180);
-//    delay(1000);
-//    S2.write(0);
-//    delay(1000);
-//    S2.write(180);
-//    delay(1000);
-//    S3.write(0);
-//    delay(1000);
-//    S3.write(180);
-//    delay(1000);
 //void loop() {
-///*    // this is just testing stuff
-////    robot_spin_cw(90, false);
-////    robot_brake(500);
-////    robot_forward(1, false); // bottom
-////    robot_brake(500);
-////    robot_forward(WHEEL_ROBOT_RADIUS_M, false); // bottom.
-////    robot_spin_ccw(90, true);
-////    follow_line();
-////
-////    robot_spin_ccw(90, true);
-////    robot_brake(1000);*/
-//    int a = 1000; // ms
-//
-//    // Start
-//    fold_arm();
-//    delay(6000);
-//
-//
-//
-//    robot_spin_cw(85, false); delay(a);
-//    robot_forward(0, true, false);  delay(a);// BOTTOM: drive, until line.
-//    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a); // BOTTOM: inch forward a bit
-//    robot_spin_ccw(0, true); delay(a);// turn until line
-//    robot_forward(0.98, false, true); delay(a);// RIGHT: drive 0.7m, following line.
-//    Assignment_6_robot_arm();
-//    delay(500);
 //    fold_arm();
 //    delay(1000);
-//    robot_spin_ccw(85, false); delay(a); // turn 90 degrees.
-//    robot_forward(0, true, false); delay(a); // TOP: drive until line
-//    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a);// TOP: inch forward a bit
-//    robot_spin_ccw(0, true); delay(a);// turn until line
-//    robot_forward(0.7, false, true); delay(a);// LEFT: drive 0.7m, following line.
-//    robot_brake(a);
-//    while(1); // STOP
-//
+////    Assignment_6_robot_arm();
+////    delay(1000);
 //
 //}
+
+
+
+void loop() {
+     //this is just testing stuff
+//    robot_spin_cw(90, false);
+//    robot_brake(500);
+//    robot_forward(1, false); // bottom
+//    robot_brake(500);
+//    robot_forward(WHEEL_ROBOT_RADIUS_M, false); // bottom.
+//    robot_spin_ccw(90, true);
+//    follow_line();
+//
+//    robot_spin_ccw(90, true);
+//    robot_brake(1000);
+//    robot_backwards(0.1);
+    int a = 1000; // ms
+
+    // Start
+    fold_arm();
+    delay(6000);
+
+    robot_spin_cw(85, false); delay(a);
+    robot_forward(0, true, false);  delay(a);// BOTTOM: drive, until line.
+    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a); // BOTTOM: inch forward a bit
+    robot_spin_ccw(0, true); delay(a);// turn until line
+    robot_forward(1.0, false, true); delay(a);// RIGHT: drive 0.97m, following line.
+    Assignment_6_robot_arm();
+    delay(500);
+    fold_arm();
+    robot_backwards(0.1);
+    delay(1000);
+    robot_spin_ccw(85, false); delay(a); // turn 90 degrees.
+    robot_forward(0, true, false); delay(a); // TOP: drive until line
+    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a);// TOP: inch forward a bit
+    robot_spin_ccw(0, true); delay(a);// turn until line
+    robot_forward(1.0, false, true); delay(a);// LEFT: drive 0.7m, following line.
+    robot_brake(a);
+    while(1); // STOP
+}
 
 
 

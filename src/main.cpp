@@ -1,8 +1,7 @@
 #include <Arduino.h>
 #include <Servo.h>
 #include "SparkFun_TB6612.h"
-// Pi to 20 digits
-#define PI 3.14159265358979323846
+// Pi to 20 digits#define PI 3.14159265358979323846
 
 // Servos
 Servo S1;
@@ -68,7 +67,7 @@ int horizontalLineCount = 0;
 Motor LeftMotor(LEFT_MTR_I1, LEFT_MTR_I2, LEFT_MTR_PWM, 1, STBY_PIN); //
 Motor RightMotor(RIGHT_MTR_I1, RIGHT_MTR_I2, RIGHT_MTR_PWM, 1, STBY_PIN); //
 
-#define increment 0.017 // radians per 15ms
+#define increment 0.1 // radians per 15ms
 
 // Robot arm functions -----------------------------------------------------------------------------------------------
 double floatMap(double x, double in_min, double in_max, double out_min, double out_max) {
@@ -106,38 +105,45 @@ void cartesianToSpherical(double coords[3], double lengths[3], double angles[3])
     angles[1] = a + b;
     angles[2] = -(PI - theta2_prime);
 
-//    Serial.println(l);
-//    Serial.println(angles[0]);
-//    Serial.println(angles[1]);
-//    Serial.println(angles[2]);
-    // forward kinematics
-//    Serial.print("FORWARD KINEMATICS:  ");
-//    Serial.print(l1*cos(angles[1])+ l2*cos(angles[1] + angles[2]));
-//    Serial.print(",   ");
-//    Serial.print(l0+l1*sin(angles[1])+ l2*sin(angles[1] + angles[2]));
-//    Serial.println("\n");
+    Serial.println(l);
+    Serial.println(angles[0]);
+    Serial.println(angles[1]);
+    Serial.println(angles[2]);
+//     forward kinematics
+    Serial.print("FORWARD KINEMATICS:  ");
+    Serial.print(l1*cos(angles[1])+ l2*cos(angles[1] + angles[2]));
+    Serial.print(",   ");
+    Serial.print(l0+l1*sin(angles[1])+ l2*sin(angles[1] + angles[2]));
+    Serial.println("\n");
+//    void fold_arm() {
+//        S1.write(80);
+//        S2.write(175);
+//        S3.write(0);
+//    }
 
 }
 
-void goToPosition(double coords[3]) {
-    cartesianToSpherical(coords, armLengths, armAngles);
-//    double tolerance = 0.001;
+void servosToAngles(double angles[3]) {
+        //    double tolerance = 0.001;
 //    while(abs(armAngles[0] - currentAngle1) > tolerance || abs(armAngles[1] - currentAngle2) > tolerance || abs(armAngles[2] - currentAngle3) > tolerance) {
 
 //        int servoPulseWidth1 = floatMap(rateLimit(armAngles[0], currentAngle1), -PI / 2, PI / 2, 500, 2500);
 //        int servoPulseWidth2 = floatMap(rateLimit(armAngles[1], currentAngle2), -PI / 2, PI / 2, 500, 2500);
 //        int servoPulseWidth3 = floatMap(rateLimit(armAngles[2], currentAngle3), PI / 2, -PI / 2, 500, 2500);
-        int servoPulseWidth1 = floatMap(armAngles[0], -PI / 2, PI / 2, 500, 2500);
-        int servoPulseWidth2 = floatMap(armAngles[1]-PI/2, -PI / 2, PI / 2, 500, 2500);
-        int servoPulseWidth3 = floatMap(armAngles[2]+PI/2, -PI / 2, PI / 2, 500, 2500);
+        int servoPulseWidth1 = floatMap(angles[0]-0.15, -PI / 2, PI / 2, 500, 2500);
+        int servoPulseWidth2 = floatMap(angles[1]-PI/2, -PI / 2, PI / 2, 500, 2500);
+        int servoPulseWidth3 = floatMap(angles[2]+PI/2, -PI / 2, PI / 2, 500, 2500);
 
         S1.writeMicroseconds(servoPulseWidth1);
         S2.writeMicroseconds(servoPulseWidth2);
         S3.writeMicroseconds(servoPulseWidth3);
 
-        //delay(controlRate);
-        //Serial.println("ONE LOOP");
-    //}
+
+};
+
+void goToPosition(double coords[3]) {
+    cartesianToSpherical(coords, armLengths, armAngles);
+    servosToAngles(armAngles);
 }
 
 void home() {
@@ -174,6 +180,35 @@ void drawStraightLine(double initialPosition[], double endPosition[]) {
 double positions[3][3] = {{0, 90,  250},
                           {0, 180, 250},
                           {0, 112, 70}};
+// arm lengths - {65.5, 120, 160}
+
+double foldedPosition[3] = {0, 32, 115.5};
+
+
+
+
+
+
+void fold_arm() {
+    // forward kinematics on these angles to get the position
+    goToPosition(foldedPosition);
+    // then move to that position.
+//    S1.write(80);
+//    delay(500);
+//    S3.write(0);
+//    delay(500);
+//    S2.write(175);
+//    delay(500);
+
+
+}
+
+
+double positions2[6][3] = {{0, 90,  250}, // away
+                           {0, 200, 250}, // top
+                           {0, 130, 70}, //bottom
+                            {120, 150, 120}, //right
+                            {-120, 150, 120}}; //left
 
 void Assignment_4_robot_arm() {
     goToPosition(positions[0]);
@@ -185,7 +220,129 @@ void Assignment_4_robot_arm() {
 //    drawStraightLine(positions[3], positions[4]);
 //    drawStraightLine(positions[4], positions[5]);
 //    drawStraightLine(positions[5], positions[0]);
-    while (1);
+//    while (1);
+    Serial.println("---------------------------------\n\n\n");
+
+
+}
+
+double rateLimit(double desiredAngle, double &currentAngle) {
+    double positionCommand = 0;
+    if (desiredAngle > currentAngle) {
+        positionCommand = min(desiredAngle, currentAngle + increment);
+        currentAngle = positionCommand;
+    }
+    else if (desiredAngle < currentAngle) {
+        positionCommand = max(desiredAngle, currentAngle - increment);
+        currentAngle = positionCommand;
+    }
+    else {
+        positionCommand = desiredAngle;
+        currentAngle = positionCommand;
+    }
+    return positionCommand;
+
+}
+
+void foldedToDrawing() {
+
+    double foldedAngles[3] = {80, 175, 0};
+    currentAngle1 = foldedAngles[0];
+    currentAngle2 = foldedAngles[1];
+    currentAngle3 = foldedAngles[2];
+    double drawingAngles[3];
+
+    cartesianToSpherical(positions2[0], armLengths, drawingAngles);
+    double tolerance = 0.001;
+
+    // rate limit each individually
+    while(abs(drawingAngles[0] - currentAngle1) > tolerance) {
+        int servoPulseWidth1 = floatMap(rateLimit(drawingAngles[0], currentAngle1)-0.15, -PI / 2, PI / 2, 500, 2500);
+        S1.writeMicroseconds(servoPulseWidth1);
+        delay(15);
+    }
+    while(abs(drawingAngles[1] - currentAngle2) > tolerance) {
+        int servoPulseWidth2 = floatMap(rateLimit(drawingAngles[1], currentAngle2)-PI/2, -PI / 2, PI / 2, 500, 2500);
+        S2.writeMicroseconds(servoPulseWidth2);
+        delay(15);
+    }
+    while(abs(drawingAngles[2] - currentAngle3) > tolerance) {
+        int servoPulseWidth3 = floatMap(rateLimit(drawingAngles[2], currentAngle3)+PI/2, PI / 2, -PI / 2, 500, 2500);
+        S3.writeMicroseconds(servoPulseWidth3);
+        delay(15);
+    }
+
+
+//    while(abs(drawingAngles[0] - currentAngle1) > tolerance || abs(drawingAngles[1] - currentAngle2) > tolerance || abs(drawingAngles[2] - currentAngle3) > tolerance) {
+//
+////        int servoPulseWidth1 = floatMap(rateLimit(drawingAngles[0], currentAngle1), -PI / 2, PI / 2, 500, 2500);
+////        int servoPulseWidth2 = floatMap(rateLimit(drawingAngles[1], currentAngle2), -PI / 2, PI / 2, 500, 2500);
+////        int servoPulseWidth3 = floatMap(rateLimit(drawingAngles[2], currentAngle3), PI / 2, -PI / 2, 500, 2500);
+//        int servoPulseWidth1 = floatMap(rateLimit(drawingAngles[0], currentAngle1)-0.15, -PI / 2, PI / 2, 500, 2500);
+//        int servoPulseWidth2 = floatMap(rateLimit(drawingAngles[1], currentAngle2)-PI/2, -PI / 2, PI / 2, 500, 2500);
+//        int servoPulseWidth3 = floatMap(rateLimit(drawingAngles[2], currentAngle3)+PI/2, -PI / 2, PI / 2, 500, 2500);
+//
+//
+//        S1.writeMicroseconds(servoPulseWidth1);
+//        S2.writeMicroseconds(servoPulseWidth2);
+//        S3.writeMicroseconds(servoPulseWidth3);
+//        Serial.println("Current angles:");
+//        Serial.println(currentAngle1);
+//        Serial.println(currentAngle2);
+//        Serial.println(currentAngle3);
+//        Serial.println("WE ENTERED THIS LOOP - folded to drawing");
+//        delay(15);
+//    }
+
+}
+
+void drawingToFolded() {
+
+    double drawingAngles[3];
+    cartesianToSpherical(positions2[0], armLengths, drawingAngles);
+
+    double foldedAngles[3] = {80, 175, 0};
+
+    currentAngle1 = drawingAngles[0];
+    currentAngle2 = drawingAngles[1];
+    currentAngle3 = drawingAngles[2];
+
+    double tolerance = 0.001;
+    while(abs(foldedAngles[0] - currentAngle1) > tolerance || abs(foldedAngles[1] - currentAngle2) > tolerance || abs(foldedAngles[2] - currentAngle3) > tolerance) {
+
+        int servoPulseWidth1 = floatMap(rateLimit(foldedAngles[0], currentAngle1), -PI / 2, PI / 2, 500, 2500);
+        int servoPulseWidth2 = floatMap(rateLimit(foldedAngles[1], currentAngle2), -PI / 2, PI / 2, 500, 2500);
+        int servoPulseWidth3 = floatMap(rateLimit(foldedAngles[2], currentAngle3), PI / 2, -PI / 2, 500, 2500);
+
+        S1.writeMicroseconds(servoPulseWidth1);
+        S2.writeMicroseconds(servoPulseWidth2);
+        S3.writeMicroseconds(servoPulseWidth3);
+        delay(15);
+    }
+
+}
+
+void Assignment_6_robot_arm() {
+//    goToPosition(positions2[0]);
+//    drawStraightLine(foldedPosition, positions2[0]);
+    fold_arm();
+    delay(1000);
+    foldedToDrawing();
+    delay(1000);
+
+    //vertical line triangle
+    drawStraightLine(positions2[0], positions2[1]);
+    drawStraightLine(positions2[1], positions2[2]);
+    drawStraightLine(positions2[2], positions2[0]);
+
+    //horizontal line triangle
+    drawStraightLine(positions2[0], positions2[3]);
+    drawStraightLine(positions2[3], positions2[4]);
+    drawStraightLine(positions2[4], positions2[0]);
+//    drawStraightLine(positions2[0], foldedPosition);
+    delay(1000);
+    drawingToFolded();
+    fold_arm();
     Serial.println("---------------------------------\n\n\n");
 
 
@@ -299,7 +456,7 @@ void robot_brake(int del) {
     delay(del);
 }
 
-void robot_forward(double distance_to_travel_m, bool until_line, bool stop_on_horisontal) {
+void robot_forward(double distance_to_travel_m, bool until_line, bool stop_on_horizontal) {
     Serial.println("ROBOT FORWARDS");
 
     // Closed loop control
@@ -380,8 +537,8 @@ void robot_forward(double distance_to_travel_m, bool until_line, bool stop_on_ho
                     reference_speed_left = ((VBase - a*b) * loop_time_ms * 1e-3);
                     reference_speed_right =((VBase + a*b) * loop_time_ms * 1e-3);
                     break;
-                case (0b111): // if we see the horisontal line, stop
-                    if (stop_on_horisontal){
+                case (0b111): // if we see the horizontal line, stop
+                    if (stop_on_horizontal){
                         robot_brake(100);
                         return;
                     }
@@ -638,65 +795,6 @@ void robot_spin_ccw(int degrees, bool until_line) {
 
 
 
-//void move_according_to_line_sensor(int line_pos){ // line_pos value got from line_sensor() function
-//    switch(line_pos){
-//        case -2:
-//            //turn a lot left
-//            robot_spin_ccw(25);
-//            robot_forward(200);
-//            break;
-//        case -1:
-//            //turn a bit left
-//            robot_spin_ccw(10);
-//            robot_forward(200);
-//            break;
-//        case 1:
-//            //turn a bit right
-//            robot_spin_cw(10);
-//            robot_forward(200);
-//            break;
-//        case 2:
-//            //turn a lot right
-//            robot_spin_cw(25);
-//            robot_forward(200);
-//            break;
-//        case -5:
-//            //find the line
-//            robot_forward(100);//until case 5
-//            break;
-//        case 5:
-//            //start/stop/right angle
-//            horizontalLineCount++;
-//            //first 5 should turn to the right, then go straight
-//            if (horizontalLineCount == 1){
-//                robot_spin_ccw(90);
-//                robot_forward(500);
-//            }
-//            //second 5 should turn to the left, then go straight, then turn left again, then go straight
-//            if (horizontalLineCount == 2){
-//                robot_brake();
-//                robot_spin_ccw(90);
-//                robot_forward(1000);
-//                robot_brake();
-//                robot_spin_ccw(90);
-//                robot_forward(500);
-//            }
-//            //third 5 should turn to the left, then go straight
-//            if (horizontalLineCount == 3){
-//                robot_spin_ccw(90);
-//                robot_forward(100);
-//            }
-//            //fourth 5 should stop
-//            if (horizontalLineCount == 4){
-//                robot_brake();
-//            }
-//            break;
-//        default:
-//            //go straight
-//            robot_forward(200);
-//            break;
-//    }
-//}
 
 void setup() {
     timestamp = millis();
@@ -723,49 +821,70 @@ void setup() {
 
     attachInterrupt(digitalPinToInterrupt(RIGHT_MTR_E1), right_e1_ISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(RIGHT_MTR_E2), right_e2_ISR, CHANGE);
-
-
 }
-
 
 void loop() {
-    // Start
-//    robot_spin_cw(90, false);
-//    robot_brake(500);
-//    robot_forward(1, false); // bottom
-//    robot_brake(500);
-//    robot_forward(WHEEL_ROBOT_RADIUS_M, false); // bottom.
-//    robot_spin_ccw(90, true);
-//    follow_line();
-//
-//    robot_spin_ccw(90, true);
-//    robot_brake(1000);
-
-//    Serial.println(read_line_sensors(), BIN);
-//    delay(10);
-    int a = 1000; // ms
-
-    // Start
-    delay(6000);
-
-//    robot_spin_ccw(0, true); delay(a);// turn until line
-//    robot_forward(0.7, false, true); delay(a);// RIGHT: drive 0.7m, following line.
-
-    robot_spin_cw(85, false); delay(a);
-    robot_forward(0, true, false);  delay(a);// BOTTOM: drive, until line.
-    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a); // BOTTOM: inch forward a bit
-    robot_spin_ccw(0, true); delay(a);// turn until line
-    robot_forward(0.7, false, true); delay(a);// RIGHT: drive 0.7m, following line.
-    robot_spin_ccw(85, false); delay(a); // turn 90 degrees.
-    robot_forward(0, true, false); delay(a); // TOP: drive until line
-    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a);// TOP: inch forward a bit
-    robot_spin_ccw(0, true); delay(a);// turn until line
-    robot_forward(0.7, false, true); delay(a);// LEFT: drive 0.7m, following line.
-    robot_brake(a);
-    while(1); // ST
-
+    fold_arm();
+    delay(1000);
+    Assignment_6_robot_arm();
+//    delay(1000);
 
 }
+
+//S3.write(90);
+//    S1.write(0);
+//    delay(1000);
+//    S1.write(180);
+//    delay(1000);
+//    S2.write(0);
+//    delay(1000);
+//    S2.write(180);
+//    delay(1000);
+//    S3.write(0);
+//    delay(1000);
+//    S3.write(180);
+//    delay(1000);
+//void loop() {
+///*    // this is just testing stuff
+////    robot_spin_cw(90, false);
+////    robot_brake(500);
+////    robot_forward(1, false); // bottom
+////    robot_brake(500);
+////    robot_forward(WHEEL_ROBOT_RADIUS_M, false); // bottom.
+////    robot_spin_ccw(90, true);
+////    follow_line();
+////
+////    robot_spin_ccw(90, true);
+////    robot_brake(1000);*/
+//    int a = 1000; // ms
+//
+//    // Start
+//    fold_arm();
+//    delay(6000);
+//
+//
+//
+//    robot_spin_cw(85, false); delay(a);
+//    robot_forward(0, true, false);  delay(a);// BOTTOM: drive, until line.
+//    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a); // BOTTOM: inch forward a bit
+//    robot_spin_ccw(0, true); delay(a);// turn until line
+//    robot_forward(0.98, false, true); delay(a);// RIGHT: drive 0.7m, following line.
+//    Assignment_6_robot_arm();
+//    delay(500);
+//    fold_arm();
+//    delay(1000);
+//    robot_spin_ccw(85, false); delay(a); // turn 90 degrees.
+//    robot_forward(0, true, false); delay(a); // TOP: drive until line
+//    robot_forward(WHEEL_ROBOT_RADIUS_M, false, false); delay(a);// TOP: inch forward a bit
+//    robot_spin_ccw(0, true); delay(a);// turn until line
+//    robot_forward(0.7, false, true); delay(a);// LEFT: drive 0.7m, following line.
+//    robot_brake(a);
+//    while(1); // STOP
+//
+//
+//}
+
+
 
 void testingLoop() {
 //    robot_forward(0.3);
@@ -792,20 +911,20 @@ void testingLoop() {
     robot_spin_ccw(90, false);
     robot_brake(1000);
 
-    // test encodders
+    // test encoders
 //    robot_forward(1);
 //    Serial.println(String(left_encoder_count) + " " + String(right_encoder_count));
-////    delay(10);
+//    delay(10);
 
 }
 
 
-
+//    Serial.println(read_line_sensors(), BIN);
+//    delay(10);
 
 //void loop() {
 //    // Homing sequence
 //    S1.write(90);
 //    S2.write(90);
 //    S3.write(180);
-//
 //}
